@@ -1,0 +1,12 @@
+# Data: never commit (spec §4.1). Data lives outside the repo.
+data/
+*.csv
+# Model weights and job logs
+*.pt
+*.pth
+checkpoints/
+*.out
+*.err
+# Python / macOS clutter
+__pycache__/
+.DS_Store
