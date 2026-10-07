@@ -1,6 +1,7 @@
 from pathlib import Path
+import pandas as pd
 
-def find_lobster_files(data_dir: Path, ticker="AMZN", level=10):
+def find_lobster_files(data_dir: Path, ticker: str = "AMZN", level: int = 10):
     """
     Locate the message and orderbook files for a given stock
     """
@@ -22,16 +23,31 @@ def find_lobster_files(data_dir: Path, ticker="AMZN", level=10):
 
     return msg_path, ob_path
 
-def load_raw():
+def load_raw(msg_path: Path, ob_path: Path, level: int = 10):
     """
     Load the raw message and orderbook files into a single DataFrame
     """
-    pass
+    msg_cols = ["time", "type", "order_id", "size", "price", "direction"]
+    
+    ob_cols = [] # Bid/ask 1 to 10 levels, each updated on an event (from message file)
+    for lev in range(1, level + 1):
+        ob_cols += [f"ask_p{lev}", f"ask_s{lev}", f"bid_p{lev}", f"bid_s{lev}"]
 
-def check_invariants():
+    msg = pd.read_csv(msg_path, header=None, names=msg_cols)
+    ob = pd.read_csv(ob_path, header=None, names=ob_cols)
+
+    if len(msg) != len(ob): # Ensure message and orderbook have the same number of rows
+       raise ValueError(f"Row mismatch: {len(msg)} messages vs {len(ob)} orderbook rows")
+
+    lob = pd.concat([msg, ob], axis=1) # Join message and orderbook side by side
+
+    return lob
+
+def check_invariants(lob: pd.DataFrame):
     """
     Check that the data obeys the invariants we want TimeGAN to learn
     """
+    
     pass
 
 def build_features():
