@@ -207,7 +207,8 @@ def selection_score(val_w, fake_w, stats):
     SSIM is skipped here for speed; the full report is produced by predict.py.
     """
     m = utils.evaluate(val_w, fake_w, stats, ssim=False)["fake"]
-    score = m["KL spread vs real"] + m["KL returns vs real"] + m["Any invariant broken (%)"] / 100
+    score = (m["KL spread vs real"] + m["KL returns vs real"] + m["Any invariant broken (%)"] / 100
+             + abs(m["Windows trending up (%)"] - 50) / 100)   
     return score, m
 
 
