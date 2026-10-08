@@ -63,3 +63,8 @@ class TGGenerator(TGBlock):
     def __init__(self, z_dim: int = 40, hidden: int = 24, layers: int = 3):
         super().__init__(in_dim=z_dim, out_dim=hidden, hidden=hidden, layers=layers,
                          out_act=torch.sigmoid)
+
+class TGEmbedder(TGBlock):
+    """TimeGAN embedder: real window (batch, T, n_features) -> real latent sequence (batch, T, hidden) in [0, 1]."""
+    def __init__(self, n_features: int = 40, hidden: int = 24, layers: int = 3):
+        super().__init__(in_dim=n_features, out_dim=hidden, hidden=hidden, layers=layers, out_act=torch.sigmoid)
