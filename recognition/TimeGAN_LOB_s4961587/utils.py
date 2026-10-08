@@ -71,7 +71,7 @@ def invariant_rates(x: torch.Tensor, ix: dict) -> dict:
     gaps = x[..., ix["ask_gap"] + ix["bid_gap"]]
     crossed = x[..., ix["spread"]] <= 0                        # best bid >= best ask
     disorder = (gaps <= 0).any(-1)                             # a level at or past its neighbour
-    sub_tick = (gaps < 1 - 1e-3).any(-1)                       # tolerance: float round-trip turns 1.0 into 0.99999                              # gap smaller than the 1-tick minimum
+    sub_tick = (gaps < 1 - 1e-3).any(-1)                       # below 1 tick (tolerance: float round-trip turns 1.0 into 0.99999)
     neg_vol = (x[..., ix["ask_v"] + ix["bid_v"]] < 0).any(-1)  # log(1+size) < 0  <=>  size < 0
     pct = lambda m: 100 * m.float().mean().item()
     return {"Crossed books": pct(crossed), "Ladder out of order": pct(disorder),
@@ -143,13 +143,14 @@ def summarise(x: torch.Tensor, ix: dict, ret_bin_bps: float) -> dict:
     }
 
 
-def evaluate(real_w, fake_w, stats, ref_w=None, ret_bin_bps: float = 0.225) -> dict:
+def evaluate(real_w, fake_w, stats, ref_w=None, ret_bin_bps: float = 0.225, ssim: bool = True) -> dict:
     """Score generated windows against real ones. All inputs are normalised (N, 24, 40) tensors.
 
     real_w: the comparison period (validation during development, test for final results).
     ref_w:  optional second real period (e.g. train). Scored like a generator, it gives the
             real-vs-real level to expect, separating model error from market drift.
     ret_bin_bps: return bin width, about half a tick at AMZN's price (0.005 / 222 = 0.225 bps).
+    ssim:   set False for fast checks during training (heatmap SSIM is the slowest metric).
     """
     ix = feature_index(stats)
     sets = {"real": unnormalise(real_w, stats), "fake": unnormalise(fake_w, stats)}
@@ -172,7 +173,8 @@ def evaluate(real_w, fake_w, stats, ref_w=None, ret_bin_bps: float = 0.225) -> d
         out[k]["KL returns vs real"] = _kl(real_r, r, edges)
         out[k]["KL non-zero returns vs real"] = (
             _kl(real_r[np.abs(real_r) >= ret_bin_bps / 2], r[nz], edges) if nz.any() else float("nan"))
-        out[k]["Heatmap SSIM vs real (best match)"] = best_match_ssim(heatmaps(sets[k], ix), real_h)
+        if ssim:
+            out[k]["Heatmap SSIM vs real (best match)"] = best_match_ssim(heatmaps(sets[k], ix), real_h)
     return out
 
 
