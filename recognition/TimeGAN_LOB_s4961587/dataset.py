@@ -1,6 +1,8 @@
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 def find_lobster_files(data_dir: Path, ticker: str = "AMZN", level: int = 10) -> tuple[Path, Path]:
     """
@@ -139,3 +141,30 @@ def split_and_normalise(features: pd.DataFrame, train_end_s: float = 49500, val_
     norm = lambda df: (df - mean) / std
 
     return norm(train), norm(val), norm(test), {"mean": mean, "std": std}
+
+def make_windows(df: pd.DataFrame, seq_len: int = 24, stride: int = 1) -> torch.Tensor:
+    """Cut one split into overlapping windows of shape (n_windows, seq_len, n_features).
+
+    Called per split, so no window ever crosses a train/val/test boundary.
+    """
+    x = torch.tensor(df.to_numpy(), dtype=torch.float32)          # (steps, features)
+    # unfold slides a window of seq_len along dim 0 -> (n_windows, features, seq_len)
+    return x.unfold(0, seq_len, stride).permute(0, 2, 1).contiguous()
+
+
+def get_data(data_dir, ticker: str = "AMZN", seq_len: int = 24, batch_size: int = 128,
+             freq: str = "5s", level: int = 10):
+    """Full pipeline: LOBSTER files -> features -> split/normalise -> windows.
+
+    Returns (train_loader, val_windows, test_windows, stats). Train windows are
+    shuffled for training (safe: all of them come from the training period);
+    val/test are returned whole for evaluation.
+    """
+    msg_path, ob_path = find_lobster_files(data_dir, ticker, level)
+    lob = load_raw(msg_path, ob_path, level)
+    features, _ = build_features(lob, freq=freq, level=level)
+    train, val, test, stats = split_and_normalise(features)
+
+    train_loader = DataLoader(TensorDataset(make_windows(train, seq_len)),
+                              batch_size=batch_size, shuffle=True, drop_last=True)
+    return train_loader, make_windows(val, seq_len), make_windows(test, seq_len), stats
