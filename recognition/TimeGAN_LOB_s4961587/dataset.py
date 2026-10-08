@@ -167,4 +167,5 @@ def get_data(data_dir, ticker: str = "AMZN", seq_len: int = 24, batch_size: int 
 
     train_loader = DataLoader(TensorDataset(make_windows(train, seq_len)),
                               batch_size=batch_size, shuffle=True, drop_last=True)
+                              
     return train_loader, make_windows(val, seq_len), make_windows(test, seq_len), stats
