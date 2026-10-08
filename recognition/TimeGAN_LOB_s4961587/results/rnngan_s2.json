@@ -1,0 +1,39 @@
+{
+  "run": "rnngan_s2",
+  "args": {
+    "data_dir": "/home/Student/s4961587/data/LOBSTER",
+    "model": "rnngan",
+    "steps": 5000,
+    "eval_every": 250,
+    "lr": null,
+    "seed": 2,
+    "run": null
+  },
+  "lr": 0.0002,
+  "train_seconds": 109.8,
+  "params": {
+    "G": 47912,
+    "D": 45377
+  },
+  "peak_vram_mb": 167.6,
+  "best_step": 13000,
+  "best_score": 1.6345301704871413,
+  "best_val_metrics": {
+    "Spread mean (ticks)": 10.224503517150879,
+    "Spread std (ticks)": 3.6183857917785645,
+    "5s return std (bps)": 0.8698885440826416,
+    "Mean 5s return (bps)": -0.09706959873437881,
+    "Windows trending up (%)": 26.255380200860834,
+    "Zero returns (%)": 10.377809660449545,
+    "Diversity: std of window-mean spread": 0.5470987558364868,
+    "Vol clustering: ACF |ret| lag 1": 0.24483655393123627,
+    "Crossed books (%)": 0.005978000990580767,
+    "Ladder out of order (%)": 55.61334490776062,
+    "Gap < 1 tick (%)": 94.42850351333618,
+    "Negative volume (%)": 0.0,
+    "Any invariant broken (%)": 55.61334490776062,
+    "KL spread vs real": 0.11935469911278478,
+    "KL returns vs real": 0.9590420222967503,
+    "KL non-zero returns vs real": 1.1438016792795782
+  }
+}
