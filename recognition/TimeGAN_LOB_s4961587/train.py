@@ -279,6 +279,17 @@ def main():
                          eval_fn=lambda s: save_if_best(s, nets, gen), eval_every=args.eval_every)
         plot_losses({"RNN-GAN": h}, run, Path(f"figures/{run}_losses.png"))
 
+    # Quick-look figures from the best checkpoint, on VALIDATION (test stays untouched)
+    ckpt = torch.load(f"checkpoints/{run}.pt", weights_only=False)
+    for k, n in nets.items():
+        n.load_state_dict(ckpt[k])                              # restore the best weights, not the last ones
+    torch.manual_seed(1234)
+    fake = gen().cpu()
+    utils.plot_paths(val_w, fake, stats, label=run, path=f"figures/{run}_val_paths.png")
+    utils.plot_distributions(val_w, fake, stats, label=run, path=f"figures/{run}_val_dists.png")
+    utils.plot_book_comparison(val_w, fake, stats, label=run, path=f"figures/{run}_val_book.png")
+    plt.close("all")
+    
     summary.update(
         train_seconds=round(time.time() - t0, 1),
         params={k: sum(p.numel() for p in n.parameters()) for k, n in nets.items()},
