@@ -97,7 +97,8 @@ def build_features(lob: pd.DataFrame, freq: str = "5s", start_s: float = 35100,
 
     # 1. Resample to a clock grid. label/closed="right" puts each interval's last state
     #    at the END of the interval, so no value comes from the future (no look-ahead).
-    lob = lob.set_index(pd.to_datetime(lob["time"], unit="s"))   # datetime: grid anchors at midnight
+    t = pd.Timestamp("2012-06-21") + pd.to_timedelta(lob["time"], unit="s")   # real session date
+    lob = lob.set_index(t)
     g = lob.resample(freq, label="right", closed="right").last().ffill()
 
     # 2. Features
@@ -113,11 +114,12 @@ def build_features(lob: pd.DataFrame, freq: str = "5s", start_s: float = 35100,
         f[f"bid_logv{i}"] = np.log1p(g[f"bid_s{i}"])
 
     # 3. Trim last, so every row in the window has a valid previous mid
-    keep = (f.index >= pd.to_datetime(start_s, unit="s")) & (f.index <= pd.to_datetime(end_s, unit="s"))
+    day = pd.Timestamp("2012-06-21")
+    keep = (f.index >= day + pd.to_timedelta(start_s, unit="s")) & (f.index <= day + pd.to_timedelta(end_s, unit="s"))
 
     return f[keep], mid[keep]
 
-def make_splits():
+def split_and_normalise(features: pd.DataFrame, train_end_s: float = 49500, val_end_s: float = 53100):
     """
     Split the data into train, validation, and test sets in chronological order
     Train: first 67% of the data - rounds to whole hours when first and last 15 minutes are trimmed.
@@ -125,4 +127,15 @@ def make_splits():
     Test: last 17% of the data
     4-1-1 hours split
     """
-    pass
+    day = features.index[0].normalize()                       # midnight of the data's own date
+    t_train = day + pd.to_timedelta(train_end_s, unit="s")
+    t_val = day + pd.to_timedelta(val_end_s, unit="s")
+    train = features[features.index < t_train]
+    val = features[(features.index >= t_train) & (features.index < t_val)]
+    test = features[features.index >= t_val]
+
+    mean = train.mean()
+    std = train.std() + 1e-8                 # epsilon guards against a constant column
+    norm = lambda df: (df - mean) / std
+
+    return norm(train), norm(val), norm(test), {"mean": mean, "std": std}
