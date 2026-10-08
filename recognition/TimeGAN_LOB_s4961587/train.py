@@ -86,8 +86,37 @@ def train_embedding(E, R, train_loader, val_w, device, steps: int = 2000, lr: fl
     with torch.no_grad():                                      # bottleneck test on unseen data
         v = val_w.to(device)
         val_mse = F.mse_loss(R(E(v)), v).item()
-        
+
     return hist, val_mse
+
+def train_supervisor(E, S, train_loader, val_w, device, steps: int = 2000, lr: float = 1e-3):
+    """TimeGAN phase 2: train the supervisor to predict the next real latent step.
+
+    The embedder (trained in phase 1) is frozen and only produces real latents H. Loss is
+    MSE(S(H)[:, :-1], H[:, 1:]): the guess made at step t vs the real step t+1.
+    Returns per-step training losses, plus the validation loss next to a persistence baseline
+    (predict 'next step = this step'), which the supervisor must beat to have learned dynamics.
+    """
+    opt = torch.optim.Adam(S.parameters(), lr=lr)              # supervisor only
+    hist, step = [], 0
+    while step < steps:
+        for (x,) in train_loader:
+            with torch.no_grad():                              # embedder frozen in this phase
+                h = E(x.to(device))
+            loss = F.mse_loss(S(h)[:, :-1], h[:, 1:])          # guesses at 1..T-1 vs real steps 2..T
+            opt.zero_grad(); loss.backward(); opt.step()
+            hist.append(loss.item()); step += 1
+            if step % 250 == 0:
+                print(f"phase 2  step {step:5d}  supervised MSE {loss.item():.5f}", flush=True)
+            if step >= steps:
+                break
+
+    with torch.no_grad():
+        h = E(val_w.to(device))
+        val_loss = F.mse_loss(S(h)[:, :-1], h[:, 1:]).item()
+        persistence = F.mse_loss(h[:, :-1], h[:, 1:]).item()  # 'next step = this step'
+        
+    return hist, val_loss, persistence
 
 
 
