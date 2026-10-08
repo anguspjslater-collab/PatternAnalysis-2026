@@ -68,3 +68,13 @@ class TGEmbedder(TGBlock):
     """TimeGAN embedder: real window (batch, T, n_features) -> real latent sequence (batch, T, hidden) in [0, 1]."""
     def __init__(self, n_features: int = 40, hidden: int = 24, layers: int = 3):
         super().__init__(in_dim=n_features, out_dim=hidden, hidden=hidden, layers=layers, out_act=torch.sigmoid)
+
+class TGRecovery(TGBlock):
+    """TimeGAN recovery: latent sequence (batch, T, hidden) -> feature window (batch, T, n_features).
+
+    Decodes both real latents (reconstruction loss) and generated latents (producing synthetic
+    windows). Linear output, because features are z-scores and unbounded, unlike the paper's
+    [0, 1] min-max data with a sigmoid output.
+    """
+    def __init__(self, n_features: int = 40, hidden: int = 24, layers: int = 3):
+        super().__init__(in_dim=hidden, out_dim=n_features, hidden=hidden, layers=layers, out_act=None)
