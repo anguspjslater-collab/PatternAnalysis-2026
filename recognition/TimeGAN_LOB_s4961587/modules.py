@@ -106,3 +106,8 @@ def tg_generate(G, S, R, n: int, seq_len: int = 24, z_dim: int = 40, device: str
     """TimeGAN sampling: uniform noise -> generator -> supervisor -> recovery. Returns normalised windows."""
     z = torch.rand(n, seq_len, z_dim, device=device)
     return R(S(G(z)))
+
+@torch.no_grad()
+def rnngan_generate(G, n: int, seq_len: int = 24, z_dim: int = 40, device: str = "cpu") -> torch.Tensor:
+    """RNN-GAN sampling: Gaussian noise -> generator. Returns normalised windows."""
+    return G(torch.randn(n, seq_len, z_dim, device=device))
