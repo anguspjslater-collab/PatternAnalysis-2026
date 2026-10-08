@@ -115,8 +115,72 @@ def train_supervisor(E, S, train_loader, val_w, device, steps: int = 2000, lr: f
         h = E(val_w.to(device))
         val_loss = F.mse_loss(S(h)[:, :-1], h[:, 1:]).item()
         persistence = F.mse_loss(h[:, :-1], h[:, 1:]).item()  # 'next step = this step'
-        
+
     return hist, val_loss, persistence
+
+def moment_loss(x_hat: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Match per-(step, feature) std and mean across the batch (original TimeGAN 'G_loss_V')."""
+    return (x_hat.std(0) - x.std(0)).abs().mean() + (x_hat.mean(0) - x.mean(0)).abs().mean()
+
+
+def train_joint(E, R, G, S, D, train_loader, device, steps: int = 2000, lr: float = 1e-3,
+                z_dim: int = 40, gamma: float = 1.0):
+    """TimeGAN phase 3: joint adversarial, supervised, moment and reconstruction training.
+
+    Follows the original implementation (Yoon et al., 2019): per step, two generator and two
+    embedder updates, then one discriminator update, skipped when D already wins (loss < 0.15).
+    Loss weights (100, 100, 10, 0.1) and uniform noise also follow the original code.
+    """
+    bce = nn.BCEWithLogitsLoss()
+    opt_gs = torch.optim.Adam(list(G.parameters()) + list(S.parameters()), lr=lr)
+    opt_er = torch.optim.Adam(list(E.parameters()) + list(R.parameters()), lr=lr)
+    opt_d = torch.optim.Adam(D.parameters(), lr=lr)
+    noise = lambda x: torch.rand(x.shape[0], x.shape[1], z_dim, device=device)   # uniform [0, 1), as original
+    hist = {"G_adv": [], "G_sup": [], "G_mom": [], "E_rec": [], "D": []}
+    step = 0
+    while step < steps:
+        for (x,) in train_loader:
+            x = x.to(device)
+            for _ in range(2):
+                # A. generator + supervisor
+                with torch.no_grad():
+                    h = E(x)                                  # real latents: a target here, E not updated
+                e_hat = G(noise(x))                           # raw fake latents
+                h_hat = S(e_hat)                              # rolled forward by the learned dynamics
+                x_hat = R(h_hat)                              # synthetic window
+                d_hat, d_e = D(h_hat), D(e_hat)
+                loss_adv = bce(d_hat, torch.ones_like(d_hat)) + gamma * bce(d_e, torch.ones_like(d_e))
+                loss_sup = F.mse_loss(S(h)[:, :-1], h[:, 1:])
+                loss_mom = moment_loss(x_hat, x)
+                loss_g = loss_adv + 100 * torch.sqrt(loss_sup) + 100 * loss_mom
+                opt_gs.zero_grad(); loss_g.backward(); opt_gs.step()
+
+                # B. embedder + recovery keep refining the latent space
+                h = E(x)
+                loss_rec = F.mse_loss(R(h), x)
+                loss_e = 10 * torch.sqrt(loss_rec) + 0.1 * F.mse_loss(S(h)[:, :-1], h[:, 1:])
+                opt_er.zero_grad(); loss_e.backward(); opt_er.step()
+
+            # C. discriminator, on detached inputs so only D learns here
+            with torch.no_grad():
+                h = E(x)
+                e_hat = G(noise(x))
+                h_hat = S(e_hat)
+            d_real, d_fake, d_fake_e = D(h), D(h_hat), D(e_hat)
+            loss_d = (bce(d_real, torch.ones_like(d_real)) + bce(d_fake, torch.zeros_like(d_fake))
+                      + gamma * bce(d_fake_e, torch.zeros_like(d_fake_e)))
+            if loss_d.item() > 0.15:                          # don't let D run away from G
+                opt_d.zero_grad(); loss_d.backward(); opt_d.step()
+
+            for k, v in zip(hist, [loss_adv, loss_sup, loss_mom, loss_rec, loss_d]):
+                hist[k].append(v.item())
+            step += 1
+            if step % 100 == 0:
+                print(f"phase 3  step {step:5d}  D {loss_d.item():.3f}  G_adv {loss_adv.item():.3f}  "
+                      f"G_sup {loss_sup.item():.5f}  G_mom {loss_mom.item():.3f}  E_rec {loss_rec.item():.3f}", flush=True)
+            if step >= steps:
+                break
+    return hist
 
 
 

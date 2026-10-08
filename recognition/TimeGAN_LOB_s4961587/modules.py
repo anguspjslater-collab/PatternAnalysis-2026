@@ -100,3 +100,9 @@ class TGDiscriminator(TGBlock):
     """
     def __init__(self, hidden: int = 24, layers: int = 3):
         super().__init__(in_dim=hidden, out_dim=1, hidden=hidden, layers=layers, out_act=None)
+
+@torch.no_grad()
+def tg_generate(G, S, R, n: int, seq_len: int = 24, z_dim: int = 40, device: str = "cpu") -> torch.Tensor:
+    """TimeGAN sampling: uniform noise -> generator -> supervisor -> recovery. Returns normalised windows."""
+    z = torch.rand(n, seq_len, z_dim, device=device)
+    return R(S(G(z)))
