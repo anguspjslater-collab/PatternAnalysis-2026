@@ -160,12 +160,13 @@ def get_data(data_dir, ticker: str = "AMZN", seq_len: int = 24, batch_size: int 
     shuffled for training (safe: all of them come from the training period);
     val/test are returned whole for evaluation.
     """
-    msg_path, ob_path = find_lobster_files(data_dir, ticker, level)
-    lob = load_raw(msg_path, ob_path, level)
-    features, _ = build_features(lob, freq=freq, level=level)
+    file_level = 10                                            # LOBSTER files on disk are always Level-10
+    msg_path, ob_path = find_lobster_files(data_dir, ticker, file_level)
+    lob = load_raw(msg_path, ob_path, file_level)
+    features, _ = build_features(lob, freq=freq, level=level)  # keep only the top `level` levels
     train, val, test, stats = split_and_normalise(features)
 
     train_loader = DataLoader(TensorDataset(make_windows(train, seq_len)),
                               batch_size=batch_size, shuffle=True, drop_last=True)
-                              
+
     return train_loader, make_windows(val, seq_len), make_windows(test, seq_len), stats

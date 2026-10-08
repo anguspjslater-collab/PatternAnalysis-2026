@@ -230,16 +230,25 @@ def main():
     p.add_argument("--data_dir", required=True, help="folder containing the LOBSTER files (searched recursively)")
     p.add_argument("--model", choices=["rnngan", "timegan"], default="timegan")
     p.add_argument("--steps", type=int, default=2000,
-                   help="TimeGAN: steps per phase. RNN-GAN: total steps (3x this, to match TimeGAN's total)")
+                   help="TimeGAN: phase-3 steps. RNN-GAN: total steps (3x this, to match TimeGAN's total)")
+    p.add_argument("--steps_ae", type=int, default=None, help="TimeGAN phases 1-2 steps; default = --steps")
     p.add_argument("--eval_every", type=int, default=250, help="score on validation every N steps")
     p.add_argument("--lr", type=float, default=None, help="default: 1e-3 TimeGAN (paper), 2e-4 RNN-GAN")
+    p.add_argument("--lr_joint", type=float, default=None, help="TimeGAN phase-3 learning rate; default = --lr")
+    p.add_argument("--seq_len", type=int, default=24, help="window length in 5 s steps (24 = 2 minutes)")
+    p.add_argument("--level", type=int, default=10, help="order book levels per side")
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--constrained", action="store_true", help="add ConstrainedHead to the feature-producing network (Recovery / RNN generator)")
-    p.add_argument("--run", default=None, help="name for outputs; default {model}[_con]_s{seed}")
+    p.add_argument("--constrained", action="store_true",
+                   help="add ConstrainedHead to the feature-producing network (Recovery / RNN generator)")
+    p.add_argument("--tag", default="", help="label appended to the run name for ablations, e.g. lrj1e-4")
+    p.add_argument("--run", default=None, help="name for outputs; default {model}[_con][_tag]_s{seed}")
     args = p.parse_args()
 
-    run = args.run or f"{args.model}{'_con' if args.constrained else ''}_s{args.seed}"
+    tag = f"_{args.tag}" if args.tag else ""
+    run = args.run or f"{args.model}{'_con' if args.constrained else ''}{tag}_s{args.seed}"
     lr = args.lr or (1e-3 if args.model == "timegan" else 2e-4)
+    lr_joint = args.lr_joint or lr
+    steps_ae = args.steps_ae or args.steps
     torch.manual_seed(args.seed)                                # reproducible runs
     local_rank = int(os.environ.get("LOCAL_RANK", 0))           # set by torchrun; 0 for plain python
     device = (f"cuda:{local_rank}" if torch.cuda.is_available()
@@ -248,11 +257,13 @@ def main():
         torch.cuda.reset_peak_memory_stats()
     for d in ("checkpoints", "figures", "results"):
         Path(d).mkdir(exist_ok=True)
-    print(f"run {run}  model {args.model}  device {device}  steps {args.steps}  lr {lr}", flush=True)
+    print(f"run {run}  model {args.model}  device {device}  steps {args.steps}  steps_ae {steps_ae}  "
+          f"lr {lr}  lr_joint {lr_joint}  seq_len {args.seq_len}  level {args.level}", flush=True)
 
-    train_loader, val_w, _, stats = get_data(args.data_dir)    # test split untouched until predict.py
+    train_loader, val_w, _, stats = get_data(args.data_dir, seq_len=args.seq_len, level=args.level)  # test untouched
+    n_feat = val_w.shape[-1]                                    # 4 x level features per step
     best = {"score": float("inf")}
-    summary = {"run": run, "args": vars(args), "lr": lr}
+    summary = {"run": run, "args": vars(args), "lr": lr, "lr_joint": lr_joint, "steps_ae": steps_ae}
     t0 = time.time()
 
     def maybe_constrain(net):
@@ -263,7 +274,7 @@ def main():
         pos = [cols.index("spread")] + [i for i, c in enumerate(cols) if "gap" in c]
         vol = [i for i, c in enumerate(cols) if "logv" in c]
         head = ConstrainedHead(torch.tensor(stats["mean"].to_numpy()), torch.tensor(stats["std"].to_numpy()), pos, vol)
-        return nn.Sequential(net, head)                   # network, then the head
+        return nn.Sequential(net, head)                         # network, then the head
 
     def save_if_best(step, nets, generate):
         """Score the current generator on validation; overwrite the checkpoint if it's the best so far."""
@@ -281,23 +292,26 @@ def main():
               flush=True)
 
     if args.model == "timegan":
-        E, R, S = TGEmbedder().to(device), maybe_constrain(TGRecovery()).to(device), TGSupervisor().to(device)
+        E = TGEmbedder(n_features=n_feat).to(device)
+        R = maybe_constrain(TGRecovery(n_features=n_feat)).to(device)
+        S = TGSupervisor().to(device)
         G, D = TGGenerator().to(device), TGDiscriminator().to(device)
         nets = {"E": E, "R": R, "S": S, "G": G, "D": D}
-        h1, val_rec = train_embedding(E, R, train_loader, val_w, device, args.steps, lr)
+        h1, val_rec = train_embedding(E, R, train_loader, val_w, device, steps_ae, lr)
         print(f"phase 1 done: val recon MSE {val_rec:.4f}", flush=True)
-        h2, val_sup, persistence = train_supervisor(E, S, train_loader, val_w, device, args.steps, lr)
+        h2, val_sup, persistence = train_supervisor(E, S, train_loader, val_w, device, steps_ae, lr)
         print(f"phase 2 done: val supervised MSE {val_sup:.5f} vs persistence {persistence:.5f}", flush=True)
-        gen = lambda: tg_generate(G, S, R, len(val_w), device=device)
-        h3 = train_joint(E, R, G, S, D, train_loader, device, args.steps, lr,
+        gen = lambda: tg_generate(G, S, R, len(val_w), seq_len=args.seq_len, device=device)
+        h3 = train_joint(E, R, G, S, D, train_loader, device, args.steps, lr_joint,
                          eval_fn=lambda s: save_if_best(s, nets, gen), eval_every=args.eval_every)
         summary.update(val_recon_mse=val_rec, val_supervised_mse=val_sup, persistence_mse=persistence)
         plot_losses({"Phase 1: reconstruction": h1, "Phase 2: supervised": h2, "Phase 3: joint": h3},
                     run, Path(f"figures/{run}_losses.png"))
     else:
-        G, D = maybe_constrain(RNNGenerator()).to(device), RNNDiscriminator().to(device)
+        G = maybe_constrain(RNNGenerator(n_features=n_feat)).to(device)
+        D = RNNDiscriminator(n_features=n_feat).to(device)
         nets = {"G": G, "D": D}
-        gen = lambda: rnngan_generate(G, len(val_w), device=device)
+        gen = lambda: rnngan_generate(G, len(val_w), seq_len=args.seq_len, device=device)
         h = train_rnngan(G, D, train_loader, device, 3 * args.steps, lr,
                          eval_fn=lambda s: save_if_best(s, nets, gen), eval_every=args.eval_every)
         plot_losses({"RNN-GAN": h}, run, Path(f"figures/{run}_losses.png"))
