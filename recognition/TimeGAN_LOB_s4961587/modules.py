@@ -78,3 +78,15 @@ class TGRecovery(TGBlock):
     """
     def __init__(self, n_features: int = 40, hidden: int = 24, layers: int = 3):
         super().__init__(in_dim=hidden, out_dim=n_features, hidden=hidden, layers=layers, out_act=None)
+
+class TGSupervisor(TGBlock):
+    """TimeGAN supervisor: latent sequence (batch, T, hidden) -> next-step latent predictions (batch, T, hidden).
+
+    Output at step t is the prediction for step t+1 (a GRU at step t has only seen steps 1..t).
+    Trained only on real latents with MSE(H[:, 1:], S(H)[:, :-1]); during generation it rolls the
+    generator's latents forward with the learned dynamics. One fewer layer than the other
+    networks, following the original TimeGAN implementation (Yoon et al., 2019).
+    """
+    def __init__(self, hidden: int = 24, layers: int = 2):      
+        super().__init__(in_dim=hidden, out_dim=hidden, hidden=hidden,      
+                         layers=layers, out_act=torch.sigmoid) 
