@@ -90,3 +90,13 @@ class TGSupervisor(TGBlock):
     def __init__(self, hidden: int = 24, layers: int = 2):      
         super().__init__(in_dim=hidden, out_dim=hidden, hidden=hidden,      
                          layers=layers, out_act=torch.sigmoid) 
+
+class TGDiscriminator(TGBlock):
+    """TimeGAN discriminator: latent sequence (batch, T, hidden) -> one real/fake logit per step (batch, T, 1).
+
+    Operates in latent space, comparing real latents H with generated latents Ĥ (and Ê).
+    Scoring every step gives feedback on the whole sequence. Outputs logits; BCEWithLogitsLoss
+    applies the sigmoid, so no activation here.
+    """
+    def __init__(self, hidden: int = 24, layers: int = 3):
+        super().__init__(in_dim=hidden, out_dim=1, hidden=hidden, layers=layers, out_act=None)
