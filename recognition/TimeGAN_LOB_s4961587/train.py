@@ -33,25 +33,34 @@ from modules import (RNNGenerator, RNNDiscriminator, rnngan_generate,
 
 def train_rnngan(G, D, train_loader, device, steps: int, lr: float = 2e-4, z_dim: int = 40,
                  eval_fn=None, eval_every: int = 250) -> dict:
-    """RNN-GAN baseline: plain adversarial training (non-saturating BCE), one D and one G update per step."""
+    """RNN-GAN baseline: plain adversarial training (non-saturating BCE).
+
+    Uses the same schedule as TimeGAN's joint phase (two generator updates per step, then one
+    discriminator update, skipped when D already wins with loss < 0.15), so differences between
+    the models reflect architecture rather than training tricks.
+    """
     bce = nn.BCEWithLogitsLoss()                                # sigmoid + BCE, numerically stable
     opt_G = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.999))   # standard GAN Adam settings
     opt_D = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.999))
+    noise = lambda x: torch.randn(x.shape[0], x.shape[1], z_dim, device=device)
     hist, step = {"D": [], "G": []}, 0
     while step < steps:
         for (real,) in train_loader:
             real = real.to(device)
-            fake = G(torch.randn(real.shape[0], real.shape[1], z_dim, device=device))
 
-            # Discriminator: real -> 1, fake -> 0. detach() stops this update reaching G.
-            d_real, d_fake = D(real), D(fake.detach())
+            # CHANGED: generator first, twice per step, fresh noise each time
+            for _ in range(2):
+                d_fake = D(G(noise(real)))
+                loss_G = bce(d_fake, torch.ones_like(d_fake))   # make D score fakes as real
+                opt_G.zero_grad(); loss_G.backward(); opt_G.step()
+
+            # CHANGED: discriminator after, on new fakes from the updated generator
+            with torch.no_grad():
+                fake = G(noise(real))                           # no_grad: D's update can't reach G
+            d_real, d_fake = D(real), D(fake)
             loss_D = bce(d_real, torch.ones_like(d_real)) + bce(d_fake, torch.zeros_like(d_fake))
-            opt_D.zero_grad(); loss_D.backward(); opt_D.step()
-
-            # Generator: make D score fakes as real
-            d_fake = D(fake)
-            loss_G = bce(d_fake, torch.ones_like(d_fake))
-            opt_G.zero_grad(); loss_G.backward(); opt_G.step()
+            if loss_D.item() > 0.15:                            # CHANGED: don't let D run away from G
+                opt_D.zero_grad(); loss_D.backward(); opt_D.step()
 
             hist["D"].append(loss_D.item()); hist["G"].append(loss_G.item())
             step += 1
@@ -289,7 +298,7 @@ def main():
     utils.plot_distributions(val_w, fake, stats, label=run, path=f"figures/{run}_val_dists.png")
     utils.plot_book_comparison(val_w, fake, stats, label=run, path=f"figures/{run}_val_book.png")
     plt.close("all")
-    
+
     summary.update(
         train_seconds=round(time.time() - t0, 1),
         params={k: sum(p.numel() for p in n.parameters()) for k, n in nets.items()},
