@@ -63,6 +63,42 @@ def heatmaps(x: torch.Tensor, ix: dict) -> torch.Tensor:
     rows = ix["ask_v"][::-1] + ix["bid_v"]
     return x[..., rows].transpose(-1, -2)
 
+def snap_windows(w: torch.Tensor, stats: dict, mid0: float = 2_220_000.0) -> torch.Tensor:
+    """Put generated windows onto the exchange's price and size grid (post-processing).
+
+    Takes normalised windows (N, T, F) and returns normalised windows in which, in real units:
+      - spread and level gaps are whole ticks,
+      - the best bid is a whole cent and best ask = bid + spread, so the mid moves in half-tick steps,
+      - returns are recomputed from that snapped mid path, so small continuous drifts become
+        flat stretches followed by one-tick jumps (as on a real exchange),
+      - sizes are whole shares.
+    Nothing is clipped: a gap that rounds to 0 or below stays invalid, so invariant rates measured
+    on snapped windows still reveal violations. The price LEVEL is snapped (not each return), so
+    drift is preserved. mid0 anchors the price level (LOBSTER units, default about $222).
+    """
+    ix = feature_index(stats)
+    x = unnormalise(w, stats).clone()
+    half = TICK / 2
+
+    spread = torch.round(x[..., ix["spread"]])                                  # whole ticks
+    mid = mid0 * torch.exp(torch.cumsum(x[..., ix["ret"]], dim=-1))             # continuous mid path
+    bid = torch.round((mid - spread * half) / TICK) * TICK                      # best bid on the cent grid
+    mid_s = bid + spread * half                                                 # snapped mid (half-tick grid)
+    prev = torch.cat([torch.full_like(mid_s[..., :1], round(mid0 / half) * half), mid_s[..., :-1]], dim=-1)
+    x[..., ix["ret"]] = torch.log(mid_s / prev)                                 # returns from the snapped path
+    x[..., ix["spread"]] = spread
+    gaps = ix["ask_gap"] + ix["bid_gap"]
+    x[..., gaps] = torch.round(x[..., gaps])                                    # whole-tick gaps
+
+    vols = ix["ask_v"] + ix["bid_v"]
+    logv = x[..., vols]
+    shares = torch.round(torch.expm1(logv.clamp(min=0)))                        # whole shares
+    x[..., vols] = torch.where(logv >= 0, torch.log1p(shares), logv)            # negative sizes left visible
+
+    mean = torch.tensor(stats["mean"].to_numpy(), dtype=torch.float32)
+    std = torch.tensor(stats["std"].to_numpy(), dtype=torch.float32)
+    return (x - mean) / std
+
 
 # ----------------------------------------------------------------------------- metrics
 
