@@ -120,10 +120,11 @@ class ConstrainedHead(nn.Module):
     def forward(self, y: torch.Tensor) -> torch.Tensor:
         out = y.clone()
         p, v = self.pos_idx, self.vol_idx
-        ticks = 1 + F.softplus(y[..., p])                               # > 1 tick, always
+        raw = y[..., p] * self.std[p] + self.mean[p]                   # network's guess in ticks
+        ticks = 1 + F.softplus(raw - 1)                                 # soft floor: ~raw above 1, never below 1
         out[..., p] = (ticks - self.mean[p]) / self.std[p]              # back to z-scores
-        logv = F.softplus(y[..., v])                                    # >= 0, always
-        out[..., v] = (logv - self.mean[v]) / self.std[v]
+        raw_v = y[..., v] * self.std[v] + self.mean[v]                  # guess in log(1 + shares)
+        out[..., v] = (F.softplus(raw_v) - self.mean[v]) / self.std[v]  # soft floor at 0
         return out
 
 @torch.no_grad()

@@ -2,8 +2,9 @@
 
 Usage:
     python train.py --data_dir ~/Desktop/LOBSTER --model timegan --steps 300 --eval_every 100   (Mac smoke test)
-    python train.py --data_dir ~/data/LOBSTER --model timegan --steps 10000 --seed 0            (Rangpur)
-    python train.py --data_dir ~/data/LOBSTER --model rnngan  --steps 10000 --seed 0
+    python train.py --data_dir ~/data/LOBSTER --model timegan --steps 5000 --seed 0             (Rangpur)
+    python train.py --data_dir ~/data/LOBSTER --model rnngan  --steps 5000 --seed 0
+    python train.py --data_dir ~/data/LOBSTER --model timegan --steps 5000 --constrained         (valid-by-construction books)
 
 Every --eval_every steps the generator is scored on the VALIDATION windows (KL on spread and
 returns plus invariant breakage). The best-scoring checkpoint is kept, so both models are selected
@@ -25,7 +26,7 @@ import torch.nn.functional as F
 
 import utils
 from dataset import get_data
-from modules import (RNNGenerator, RNNDiscriminator, rnngan_generate,
+from modules import (RNNGenerator, RNNDiscriminator, rnngan_generate, ConstrainedHead,
                      TGEmbedder, TGRecovery, TGSupervisor, TGGenerator, TGDiscriminator, tg_generate)
 
 
@@ -48,18 +49,18 @@ def train_rnngan(G, D, train_loader, device, steps: int, lr: float = 2e-4, z_dim
         for (real,) in train_loader:
             real = real.to(device)
 
-            # CHANGED: generator first, twice per step, fresh noise each time
+            # generator first, twice per step, fresh noise each time
             for _ in range(2):
                 d_fake = D(G(noise(real)))
                 loss_G = bce(d_fake, torch.ones_like(d_fake))   # make D score fakes as real
                 opt_G.zero_grad(); loss_G.backward(); opt_G.step()
 
-            # CHANGED: discriminator after, on new fakes from the updated generator
+            # discriminator after, on new fakes from the updated generator
             with torch.no_grad():
                 fake = G(noise(real))                           # no_grad: D's update can't reach G
             d_real, d_fake = D(real), D(fake)
             loss_D = bce(d_real, torch.ones_like(d_real)) + bce(d_fake, torch.zeros_like(d_fake))
-            if loss_D.item() > 0.15:                            # CHANGED: don't let D run away from G
+            if loss_D.item() > 0.15:                            # don't let D run away from G
                 opt_D.zero_grad(); loss_D.backward(); opt_D.step()
 
             hist["D"].append(loss_D.item()); hist["G"].append(loss_G.item())
@@ -198,17 +199,18 @@ def train_joint(E, R, G, S, D, train_loader, device, steps: int = 2000, lr: floa
     return hist
 
 
-# ----------------------------------------------------------------------------- selection and plots
+# -- selection and plots --------------------------------------------------------
 
 def selection_score(val_w, fake_w, stats):
     """Validation score used to pick the best checkpoint (lower is better).
 
-    Spec metrics (KL on spread and on returns) plus the fraction of books breaking an invariant.
-    SSIM is skipped here for speed; the full report is produced by predict.py.
+    Spec metrics (KL on spread and on returns), plus the fraction of books breaking an invariant,
+    plus a drift penalty |% windows trending up - 50| / 100 (a checkpoint whose windows all trend
+    one way is penalised). SSIM is skipped here for speed; the full report is produced by predict.py.
     """
     m = utils.evaluate(val_w, fake_w, stats, ssim=False)["fake"]
     score = (m["KL spread vs real"] + m["KL returns vs real"] + m["Any invariant broken (%)"] / 100
-             + abs(m["Windows trending up (%)"] - 50) / 100)   
+             + abs(m["Windows trending up (%)"] - 50) / 100)          # penalise directional drift
     return score, m
 
 
@@ -232,10 +234,11 @@ def main():
     p.add_argument("--eval_every", type=int, default=250, help="score on validation every N steps")
     p.add_argument("--lr", type=float, default=None, help="default: 1e-3 TimeGAN (paper), 2e-4 RNN-GAN")
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--run", default=None, help="name for outputs; default {model}_s{seed}")
+    p.add_argument("--constrained", action="store_true", help="add ConstrainedHead to the feature-producing network (Recovery / RNN generator)")
+    p.add_argument("--run", default=None, help="name for outputs; default {model}[_con]_s{seed}")
     args = p.parse_args()
 
-    run = args.run or f"{args.model}_s{args.seed}"
+    run = args.run or f"{args.model}{'_con' if args.constrained else ''}_s{args.seed}"
     lr = args.lr or (1e-3 if args.model == "timegan" else 2e-4)
     torch.manual_seed(args.seed)                                # reproducible runs
     local_rank = int(os.environ.get("LOCAL_RANK", 0))           # set by torchrun; 0 for plain python
@@ -251,6 +254,16 @@ def main():
     best = {"score": float("inf")}
     summary = {"run": run, "args": vars(args), "lr": lr}
     t0 = time.time()
+
+    def maybe_constrain(net):
+        """Wrap a generator-side network with the ConstrainedHead when --constrained is set."""
+        if not args.constrained:
+            return net
+        cols = list(stats["mean"].index)
+        pos = [cols.index("spread")] + [i for i, c in enumerate(cols) if "gap" in c]
+        vol = [i for i, c in enumerate(cols) if "logv" in c]
+        head = ConstrainedHead(torch.tensor(stats["mean"].to_numpy()), torch.tensor(stats["std"].to_numpy()), pos, vol)
+        return nn.Sequential(net, head)                   # network, then the head
 
     def save_if_best(step, nets, generate):
         """Score the current generator on validation; overwrite the checkpoint if it's the best so far."""
@@ -268,7 +281,7 @@ def main():
               flush=True)
 
     if args.model == "timegan":
-        E, R, S = TGEmbedder().to(device), TGRecovery().to(device), TGSupervisor().to(device)
+        E, R, S = TGEmbedder().to(device), maybe_constrain(TGRecovery()).to(device), TGSupervisor().to(device)
         G, D = TGGenerator().to(device), TGDiscriminator().to(device)
         nets = {"E": E, "R": R, "S": S, "G": G, "D": D}
         h1, val_rec = train_embedding(E, R, train_loader, val_w, device, args.steps, lr)
@@ -282,7 +295,7 @@ def main():
         plot_losses({"Phase 1: reconstruction": h1, "Phase 2: supervised": h2, "Phase 3: joint": h3},
                     run, Path(f"figures/{run}_losses.png"))
     else:
-        G, D = RNNGenerator().to(device), RNNDiscriminator().to(device)
+        G, D = maybe_constrain(RNNGenerator()).to(device), RNNDiscriminator().to(device)
         nets = {"G": G, "D": D}
         gen = lambda: rnngan_generate(G, len(val_w), device=device)
         h = train_rnngan(G, D, train_loader, device, 3 * args.steps, lr,
