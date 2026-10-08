@@ -6,6 +6,7 @@ so comparing the two isolates what TimeGAN's extra components contribute.
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # -- BASELINE MODELS ------------------------------------------------------------
 class RNNGenerator(nn.Module):
@@ -100,6 +101,30 @@ class TGDiscriminator(TGBlock):
     """
     def __init__(self, hidden: int = 24, layers: int = 3):
         super().__init__(in_dim=hidden, out_dim=1, hidden=hidden, layers=layers, out_act=None)
+
+class ConstrainedHead(nn.Module):
+    """Makes every generated book valid by construction (constrained-output experiment).
+
+    Takes raw network outputs (batch, T, n_features) and returns z-scored features in which,
+    after un-normalising: spread and level gaps are > 1 tick (1 + softplus), so the book can
+    never be crossed or out of order; log-volumes are >= 0 (softplus), so sizes are never
+    negative. Returns are left unconstrained. Training mean/std are stored as buffers so they
+    are saved in the checkpoint and moved to the GPU with the model.
+    """
+    def __init__(self, mean: torch.Tensor, std: torch.Tensor, pos_idx: list, vol_idx: list):
+        super().__init__()
+        self.register_buffer("mean", mean.float())
+        self.register_buffer("std", std.float())
+        self.pos_idx, self.vol_idx = pos_idx, vol_idx
+
+    def forward(self, y: torch.Tensor) -> torch.Tensor:
+        out = y.clone()
+        p, v = self.pos_idx, self.vol_idx
+        ticks = 1 + F.softplus(y[..., p])                               # > 1 tick, always
+        out[..., p] = (ticks - self.mean[p]) / self.std[p]              # back to z-scores
+        logv = F.softplus(y[..., v])                                    # >= 0, always
+        out[..., v] = (logv - self.mean[v]) / self.std[v]
+        return out
 
 @torch.no_grad()
 def tg_generate(G, S, R, n: int, seq_len: int = 24, z_dim: int = 40, device: str = "cpu") -> torch.Tensor:
