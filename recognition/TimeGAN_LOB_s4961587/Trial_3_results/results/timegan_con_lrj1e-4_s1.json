@@ -1,0 +1,53 @@
+{
+  "run": "timegan_con_lrj1e-4_s1",
+  "args": {
+    "data_dir": "/home/Student/s4961587/data/LOBSTER",
+    "model": "timegan",
+    "steps": 5000,
+    "steps_ae": null,
+    "eval_every": 250,
+    "lr": null,
+    "lr_joint": 0.0001,
+    "seq_len": 24,
+    "level": 10,
+    "seed": 1,
+    "constrained": true,
+    "tag": "lrj1e-4",
+    "run": null
+  },
+  "lr": 0.001,
+  "lr_joint": 0.0001,
+  "steps_ae": 5000,
+  "val_recon_mse": 0.7765100598335266,
+  "val_supervised_mse": 0.011795713566243649,
+  "persistence_mse": 0.01567172259092331,
+  "train_seconds": 272.2,
+  "params": {
+    "E": 12552,
+    "R": 11800,
+    "S": 7800,
+    "G": 12552,
+    "D": 10825
+  },
+  "peak_vram_mb": 93.9,
+  "best_step": 4250,
+  "best_score": 0.7745503976876785,
+  "best_val_metrics": {
+    "Spread mean (ticks)": 13.318674087524414,
+    "Spread std (ticks)": 4.195388317108154,
+    "5s return std (bps)": 1.398061990737915,
+    "Mean 5s return (bps)": 0.05850972980260849,
+    "Windows trending up (%)": 46.6284074605452,
+    "Zero returns (%)": 7.8012912482066,
+    "Diversity: std of window-mean spread": 1.740707516670227,
+    "Vol clustering: ACF |ret| lag 1": 0.5075311660766602,
+    "Crossed books (%)": 0.0,
+    "Ladder out of order (%)": 0.0,
+    "Gap < 1 tick (%)": 0.0,
+    "Negative volume (%)": 0.0,
+    "Any invariant broken (%)": 0.0,
+    "KL spread vs real": 0.1546251397058175,
+    "KL returns vs real": 0.586209332587313,
+    "KL non-zero returns vs real": 0.4095468269004754
+  }
+}
