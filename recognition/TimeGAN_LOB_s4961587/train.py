@@ -26,8 +26,7 @@ import torch.nn.functional as F
 
 import utils
 from dataset import get_data
-from modules import (RNNGenerator, RNNDiscriminator, rnngan_generate, ConstrainedHead,
-                     TGEmbedder, TGRecovery, TGSupervisor, TGGenerator, TGDiscriminator, tg_generate)
+from modules import *
 
 
 # ----------------------------------------------------------------------------- baseline
@@ -74,7 +73,10 @@ def train_rnngan(G, D, train_loader, device, steps: int, lr: float = 2e-4, z_dim
     return hist
 
 
-# ----------------------------------------------------------------------------- TimeGAN phases
+# -- TimeGAN phases -------------------------------------------------------------
+def find_zi(net):
+    """The ZeroInflatedReturn module inside a (possibly wrapped) network, or None if not used."""
+    return next((m for m in net.modules() if isinstance(m, ZeroInflatedReturn)), None)
 
 def train_embedding(E, R, train_loader, val_w, device, steps: int = 2000, lr: float = 1e-3):
     """TimeGAN phase 1: train embedder + recovery as an autoencoder on reconstruction MSE.
@@ -83,6 +85,7 @@ def train_embedding(E, R, train_loader, val_w, device, steps: int = 2000, lr: fl
     Counts optimiser steps rather than epochs, as the original implementation does.
     Returns per-step training losses and the final validation reconstruction MSE.
     """
+    zi = find_zi(R)
     opt = torch.optim.Adam(list(E.parameters()) + list(R.parameters()), lr=lr)   # one optimiser, both nets
     hist, step = [], 0
     while step < steps:
@@ -90,6 +93,8 @@ def train_embedding(E, R, train_loader, val_w, device, steps: int = 2000, lr: fl
             x = x.to(device)
             x_tilde = R(E(x))                                   # window -> latent -> window
             loss = F.mse_loss(x_tilde, x)
+            if zi is not None:
+                loss = loss + zi.move_loss(x)           # teach p(move) which real steps were static
             opt.zero_grad(); loss.backward(); opt.step()
             hist.append(loss.item()); step += 1
             if step % 250 == 0:
@@ -145,6 +150,7 @@ def train_joint(E, R, G, S, D, train_loader, device, steps: int = 2000, lr: floa
     embedder updates, then one discriminator update, skipped when D already wins (loss < 0.15).
     Loss weights (100, 100, 10, 0.1) and uniform noise also follow the original code.
     """
+    zi = find_zi(R)
     bce = nn.BCEWithLogitsLoss()
     opt_gs = torch.optim.Adam(list(G.parameters()) + list(S.parameters()), lr=lr)
     opt_er = torch.optim.Adam(list(E.parameters()) + list(R.parameters()), lr=lr)
@@ -173,6 +179,8 @@ def train_joint(E, R, G, S, D, train_loader, device, steps: int = 2000, lr: floa
                 h = E(x)
                 loss_rec = F.mse_loss(R(h), x)
                 loss_e = 10 * torch.sqrt(loss_rec) + 0.1 * F.mse_loss(S(h)[:, :-1], h[:, 1:])
+                if zi is not None:
+                    loss_e = loss_e + zi.move_loss(x)   # keep p(move) anchored to real data
                 opt_er.zero_grad(); loss_e.backward(); opt_er.step()
 
             # C. discriminator, on detached inputs so only D learns here
@@ -240,12 +248,14 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--constrained", action="store_true",
                    help="add ConstrainedHead to the feature-producing network (Recovery / RNN generator)")
+    p.add_argument("--zero_inflated", action="store_true",
+                   help="TimeGAN only: zero-inflated return output (p(move) x size), see ZeroInflatedReturn")
     p.add_argument("--tag", default="", help="label appended to the run name for ablations, e.g. lrj1e-4")
     p.add_argument("--run", default=None, help="name for outputs; default {model}[_con][_tag]_s{seed}")
     args = p.parse_args()
 
     tag = f"_{args.tag}" if args.tag else ""
-    run = args.run or f"{args.model}{'_con' if args.constrained else ''}{tag}_s{args.seed}"
+    run = args.run or f"{args.model}{'_con' if args.constrained else ''}{'_zi' if args.zero_inflated else ''}{tag}_s{args.seed}"
     lr = args.lr or (1e-3 if args.model == "timegan" else 2e-4)
     lr_joint = args.lr_joint or lr
     steps_ae = args.steps_ae or args.steps
@@ -288,12 +298,18 @@ def main():
                         "model": args.model, "stats": stats, "args": vars(args)}, f"checkpoints/{run}.pt")
             flag = "  <- best, saved"
         print(f"  eval step {step:5d}  score {score:.3f}  KL spread {m['KL spread vs real']:.3f}  "
-              f"KL ret {m['KL returns vs real']:.3f}  invariants broken {m['Any invariant broken (%)']:.1f}%{flag}",
-              flush=True)
+              f"KL ret {m['KL returns vs real']:.3f}  zero ret {m['Zero returns (%)']:.1f}%  "
+              f"invariants broken {m['Any invariant broken (%)']:.1f}%{flag}", flush=True)
 
     if args.model == "timegan":
         E = TGEmbedder(n_features=n_feat).to(device)
-        R = maybe_constrain(TGRecovery(n_features=n_feat)).to(device)
+        rec = TGRecovery(n_features=n_feat + (1 if args.zero_inflated else 0))    # +1 channel: move logit
+        if args.zero_inflated:
+            cols = list(stats["mean"].index)
+            rec = nn.Sequential(rec, ZeroInflatedReturn(torch.tensor(stats["mean"].to_numpy()),
+                                                        torch.tensor(stats["std"].to_numpy()),
+                                                        ret_idx=cols.index("ret")))
+        R = maybe_constrain(rec).to(device)
         S = TGSupervisor().to(device)
         G, D = TGGenerator().to(device), TGDiscriminator().to(device)
         nets = {"E": E, "R": R, "S": S, "G": G, "D": D}

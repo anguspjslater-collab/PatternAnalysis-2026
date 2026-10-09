@@ -127,6 +127,41 @@ class ConstrainedHead(nn.Module):
         out[..., v] = (F.softplus(raw_v) - self.mean[v]) / self.std[v]  # soft floor at 0
         return out
 
+class ZeroInflatedReturn(nn.Module):
+    """Zero-inflated mid-return output: 'does the mid move this step?' x 'by how much?'.
+
+    Real 5 s books are static much of the time (29-36% of steps have exactly zero mid return),
+    but a continuous output almost never produces an exact zero. This module takes the recovery
+    network's output with ONE extra channel (a move logit) and gates the return feature with it:
+        p    = sigmoid(logit)               probability that the mid moves this step
+        gate = p                            while gradients are on (training: smooth, differentiable)
+        gate = Bernoulli(p), 0 or 1         when generating under no_grad (exact zeros)
+        ret  = gate * ret                   in real units, then re-normalised
+    p is trained with BCE against the real 'moved?' label (move_loss). The extra channel is
+    dropped, so the output has the usual number of features and the rest of the pipeline is unchanged.
+    """
+
+    def __init__(self, mean: torch.Tensor, std: torch.Tensor, ret_idx: int = 0, eps: float = 1e-6):
+        super().__init__()
+        self.register_buffer("mean", mean.float())    # training stats, to work in real units
+        self.register_buffer("std", std.float())
+        self.r, self.eps = ret_idx, eps                # eps: |log return| below this counts as 'no move'
+        self.logit = None                              # last move logits, kept for move_loss
+
+    def forward(self, y: torch.Tensor) -> torch.Tensor:
+        self.logit = y[..., -1]
+        x = y[..., :-1].clone()                        # drop the logit channel
+        p = torch.sigmoid(self.logit)
+        gate = p if torch.is_grad_enabled() else torch.bernoulli(p)
+        m, s = self.mean[self.r], self.std[self.r]
+        x[..., self.r] = (gate * (x[..., self.r] * s + m) - m) / s   # gate in real units, back to z-score
+        return x
+
+    def move_loss(self, x_real: torch.Tensor) -> torch.Tensor:
+        """BCE between the last forward pass's move logits and whether the real mid actually moved."""
+        moved = ((x_real[..., self.r] * self.std[self.r] + self.mean[self.r]).abs() > self.eps).float()
+        return F.binary_cross_entropy_with_logits(self.logit, moved)
+
 @torch.no_grad()
 def tg_generate(G, S, R, n: int, seq_len: int = 24, z_dim: int = 40, device: str = "cpu") -> torch.Tensor:
     """TimeGAN sampling: uniform noise -> generator -> supervisor -> recovery. Returns normalised windows."""
