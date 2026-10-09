@@ -1,0 +1,6 @@
+model,parameters (generator side),train time (s),peak VRAM (MB),"generate 1,000 windows (s)"
+TimeGAN + head (ae10k),32152,314.0,93.9,0.0356
+TimeGAN + head (trial 2),32152,276.6,93.9,0.0352
+"TimeGAN, no head",32152,236.5,93.9,0.0323
+RNN-GAN + head (baseline),47912,215.7,168.2,0.0308
+"RNN-GAN, no head",47912,160.0,190.3,0.0265

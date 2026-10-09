@@ -1,0 +1,31 @@
+{
+  "commit": "e216460",
+  "device": "cpu",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "runs": {
+    "TimeGAN + head (ae10k)": "Trial_3_results/checkpoints/timegan_con_ae10k_s{seed}.pt",
+    "TimeGAN + head (trial 2)": "Trial_2_results/checkpoints/timegan_con_s{seed}.pt",
+    "TimeGAN, no head": "Trial_2_results/checkpoints/timegan_s{seed}.pt",
+    "RNN-GAN + head (baseline)": "Trial_2_results/checkpoints/rnngan_con_s{seed}.pt",
+    "RNN-GAN, no head": "Trial_2_results/checkpoints/rnngan_s{seed}.pt"
+  },
+  "main": "TimeGAN + head (ae10k)",
+  "book_windows": {
+    "real": [
+      514,
+      599,
+      367,
+      68
+    ],
+    "generated": [
+      432,
+      439,
+      456,
+      576
+    ]
+  }
+}
