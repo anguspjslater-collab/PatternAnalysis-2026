@@ -35,18 +35,24 @@ def dice_per_class(logits, target, n_classes=6, eps=1e-6):
 
 
 def plot_history(history, path):
-    """Plot train/val loss and per-class val Dice against epoch, and save to path.
+    """Plot the loss breakdown and per-class validation Dice against epoch, and save to path.
+
+    Left panel: total loss, CE and (1 - soft Dice), train solid / val dashed.
+    Right panel: hard validation Dice per class (background omitted).
 
     Args:
-        history: dict with "train_loss", "val_loss" (lists) and "val_dice" (list of per-class lists).
+        history: dict with "train" and "val" (lists of per-epoch dicts with keys
+            "loss", "ce", "dice") and "val_dice" (list of per-epoch 6-class Dice lists).
         path: output .png path.
     """
-    epochs = range(1, len(history["train_loss"]) + 1)
+    epochs = range(1, len(history["train"]) + 1)
     fig, (ax_loss, ax_dice) = plt.subplots(1, 2, figsize=(12, 4))
-    ax_loss.plot(epochs, history["train_loss"], label="train")
-    ax_loss.plot(epochs, history["val_loss"], label="val")
-    ax_loss.set(xlabel="epoch", ylabel="Dice + CE loss", title="Loss")
-    ax_loss.legend()
+    for part, colour in (("loss", "k"), ("ce", "tab:blue"), ("dice", "tab:orange")):
+        ax_loss.plot(epochs, [h[part] for h in history["train"]], colour, label=f"train {part}")
+        ax_loss.plot(epochs, [h[part] for h in history["val"]], colour, ls="--", label=f"val {part}")
+    ax_loss.set(xlabel="epoch", ylabel="loss", title="Loss: total = CE + (1 - soft Dice)")
+    ax_loss.legend(fontsize=8)
+
     for c, name in enumerate(CLASS_NAMES[1:], start=1):  # skip background
         ax_dice.plot(epochs, [d[c] for d in history["val_dice"]], label=name)
     ax_dice.set(xlabel="epoch", ylabel="Dice", ylim=(0, 1), title="Validation Dice per class")

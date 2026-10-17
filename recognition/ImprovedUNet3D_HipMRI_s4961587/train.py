@@ -3,7 +3,7 @@ train.py - train a 3D U-Net on HipMRI, validate every epoch, keep the best model
 
 Usage (on Rangpur, through train.sh):
     python train.py --model unet3d --epochs 150                      # full run
-    python train.py --model unet3d --epochs 2 --limit 4 --tag smoke  # quick check
+    python train.py --model unet3d --epochs 3 --limit 4 --tag smoke  # quick check
 
 Outputs, named <model>_<tag>:
     checkpoints/<run>.pt      best weights by validation prostate Dice
@@ -63,22 +63,23 @@ def train_one_epoch(model, loader, loss_fn, opt, device):
         device: torch.device to run on.
 
     Returns:
-        Mean training loss over the epoch's batches.
+        Dict of mean "loss" (total), "ce" and "dice" (= 1 - soft Dice) over the epoch's batches.
     """
     model.train()
-    total = 0.0
+    sums = {"loss": 0.0, "ce": 0.0, "dice": 0.0}  # "dice" = 1 - soft Dice (a loss, lower is better)
     for img, lab in loader:
         img, lab = img.to(device, non_blocking=True), lab.to(device, non_blocking=True)
         opt.zero_grad(set_to_none=True)
-        # bf16 autocast: ~half the activation memory and faster convs on A100
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                             enabled=device.type == "cuda"):
             logits = model(img)
-        loss = loss_fn(logits, lab)  # DiceCELoss casts to fp32 internally
+        loss = loss_fn(logits, lab)
         loss.backward()
         opt.step()
-        total += loss.item()
-    return total / len(loader)
+        sums["loss"] += loss.item()
+        sums["ce"] += loss_fn.last["ce"]
+        sums["dice"] += loss_fn.last["dice"]
+    return {k: v / len(loader) for k, v in sums.items()}
 
 
 @torch.no_grad()
@@ -92,19 +93,23 @@ def evaluate(model, loader, loss_fn, device):
         device: torch.device to run on.
 
     Returns:
-        (mean_loss, dice): dice is a list of 6 per-class Dice scores, averaged over volumes.
+        (losses, dice): losses is a dict of mean "loss", "ce" and "dice" (= 1 - soft Dice);
+        dice is a list of 6 per-class hard Dice scores, averaged over volumes.
     """
-    model.eval()  # switch off training-only behaviour
-    total, dice_sum = 0.0, torch.zeros(NUM_CLASSES)
+    model.eval()
+    sums = {"loss": 0.0, "ce": 0.0, "dice": 0.0}
+    dice_sum = torch.zeros(NUM_CLASSES)
     for img, lab in loader:
         img, lab = img.to(device, non_blocking=True), lab.to(device, non_blocking=True)
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                             enabled=device.type == "cuda"):
             logits = model(img)
-        total += loss_fn(logits, lab).item()
+        sums["loss"] += loss_fn(logits, lab).item()
+        sums["ce"] += loss_fn.last["ce"]
+        sums["dice"] += loss_fn.last["dice"]
         dice_sum += dice_per_class(logits.float(), lab).cpu()
     n = len(loader)
-    return total / n, (dice_sum / n).tolist()
+    return {k: v / n for k, v in sums.items()}, (dice_sum / n).tolist()
 
 
 def main():
@@ -131,17 +136,17 @@ def main():
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats()
 
-    history = {"train_loss": [], "val_loss": [], "val_dice": [], "epoch_time": []}
+    history = {"train": [], "val": [], "val_dice": [], "epoch_time": []}
     best = {"dice": -1.0, "epoch": 0}
     t_train = time.time()
     for epoch in range(1, args.epochs + 1):
         t_ep = time.time()
-        tr_loss = train_one_epoch(model, loaders["train"], loss_fn, opt, device)
-        va_loss, va_dice = evaluate(model, loaders["val"], loss_fn, device)
+        tr = train_one_epoch(model, loaders["train"], loss_fn, opt, device)
+        va, va_dice = evaluate(model, loaders["val"], loss_fn, device)
         sched.step()
 
-        history["train_loss"].append(tr_loss)
-        history["val_loss"].append(va_loss)
+        history["train"].append(tr)
+        history["val"].append(va)
         history["val_dice"].append(va_dice)
         history["epoch_time"].append(time.time() - t_ep)
 
@@ -151,7 +156,8 @@ def main():
             torch.save(model.state_dict(), f"checkpoints/{run}.pt")
 
         dice_str = " ".join(f"{n[:4]} {d:.3f}" for n, d in zip(CLASS_NAMES[1:], va_dice[1:]))
-        print(f"ep {epoch:3d} | train {tr_loss:.4f} | val {va_loss:.4f} | {dice_str} "
+        print(f"ep {epoch:3d} | train {tr['loss']:.4f} (ce {tr['ce']:.4f} dice {tr['dice']:.4f}) "
+              f"| val {va['loss']:.4f} (ce {va['ce']:.4f} dice {va['dice']:.4f}) | {dice_str} "
               f"| {history['epoch_time'][-1]:.0f}s", flush=True)
 
         # Save results and curves every epoch, so a killed job still leaves evidence.

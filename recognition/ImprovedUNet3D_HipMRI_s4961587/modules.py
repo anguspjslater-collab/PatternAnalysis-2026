@@ -26,10 +26,12 @@ class DoubleConv(nn.Module):
         super().__init__()
         self.block = nn.Sequential(
             # bias=False: the norm layer subtracts the mean, which would cancel a bias anyway
-            nn.Conv3d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
+            nn.Conv3d(in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False),
+            # affine=True: learnable per-channel scale (gamma) and shift (beta) after normalising.
+            # Instance (per-scan) norm: stats don't depend on the other scan in a batch of 2.
             nn.InstanceNorm3d(out_ch, affine=True),
             nn.ReLU(inplace=True),
-            nn.Conv3d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
+            nn.Conv3d(out_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=False),
             nn.InstanceNorm3d(out_ch, affine=True),
             nn.ReLU(inplace=True),
         )
@@ -51,7 +53,8 @@ class UNet3D(nn.Module):
     def __init__(self, in_ch=1, n_classes=6, base=16):
         super().__init__()
         c1, c2, c3, c4, c5 = (base * 2**i for i in range(5))  # 16, 32, 64, 128, 256
-
+        
+        # max-pool layer used in research paper (Çiçek et al. (2016) - no trainable paramters
         self.pool = nn.MaxPool3d(2)
         self.enc1 = DoubleConv(in_ch, c1)
         self.enc2 = DoubleConv(c1, c2)
@@ -81,7 +84,7 @@ class UNet3D(nn.Module):
         d3 = self.dec3(torch.cat([self.up3(d4), e3], dim=1))
         d2 = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
         d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
-        return self.out(d1)
+        return self.out(d1) # (B, 6, 128, 128, 64)
 
 
 class DiceCELoss(nn.Module):
@@ -110,8 +113,11 @@ class DiceCELoss(nn.Module):
         dims = (0, 2, 3, 4)                                                        # sum over batch + space
         inter = (probs * onehot).sum(dims)
         denom = probs.sum(dims) + onehot.sum(dims)
-        dice = (2 * inter + self.eps) / (denom + self.eps)                         # one soft Dice per class
-        return ce + (1 - dice.mean())
+        dice = (2 * inter + self.eps) / (denom + self.eps)      # one soft Dice per class (6 classes)
+        dice_loss = 1 - dice.mean()
+        # Keep the two parts so train.py can log them separately (diagnostic only).
+        self.last = {"ce": ce.item(), "dice": dice_loss.item()}
+        return ce + dice_loss
 
 
 if __name__ == "__main__":
