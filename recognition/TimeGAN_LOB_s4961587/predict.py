@@ -40,18 +40,19 @@ import torch.nn as nn
 
 import utils
 from dataset import get_data
-from modules import RNNGenerator, TGGenerator, TGSupervisor, TGRecovery, ConstrainedHead
+from modules import RNNGenerator, TGGenerator, TGSupervisor, TGRecovery, ConstrainedHead, ZeroInflatedReturn
 
 # Models compared on the test set. {seed} is filled with 0, 1, 2.
-# The main model was chosen on VALIDATION (Trial 3); the others are the baselines and controls.
+# The main model was chosen on VALIDATION (Trial 4); the others are the baselines and controls.
 RUNS = {
-    "TimeGAN + head (ae10k)":    "Trial_3_results/checkpoints/timegan_con_ae10k_s{seed}.pt",
-    "TimeGAN + head (trial 2)":  "Trial_2_results/checkpoints/timegan_con_s{seed}.pt",
-    "TimeGAN, no head":          "Trial_2_results/checkpoints/timegan_s{seed}.pt",
-    "RNN-GAN + head (baseline)": "Trial_2_results/checkpoints/rnngan_con_s{seed}.pt",
-    "RNN-GAN, no head":          "Trial_2_results/checkpoints/rnngan_s{seed}.pt",
+    "TimeGAN + head + ZI (ae10k)": "Trial_4_results/checkpoints/timegan_con_zi_ae10k_s{seed}.pt",
+    "TimeGAN + head (ae10k)":      "Trial_3_results/checkpoints/timegan_con_ae10k_s{seed}.pt",
+    "TimeGAN + head (trial 2)":    "Trial_2_results/checkpoints/timegan_con_s{seed}.pt",
+    "TimeGAN, no head":            "Trial_2_results/checkpoints/timegan_s{seed}.pt",
+    "RNN-GAN + head (baseline)":   "Trial_2_results/checkpoints/rnngan_con_s{seed}.pt",
+    "RNN-GAN, no head":            "Trial_2_results/checkpoints/rnngan_s{seed}.pt",
 }
-MAIN = "TimeGAN + head (ae10k)"
+MAIN = "TimeGAN + head + ZI (ae10k)"
 SEEDS = (0, 1, 2)
 Z_DIM = 40                    # noise dimension used in training for both models
 N_BOOKS = 4                   # spec asks for 3-5 real-vs-synthetic heatmaps
@@ -88,9 +89,16 @@ def load_generator(path: Path, device: str):
     a, stats = ck["args"], ck["stats"]
     n_feat = len(stats["mean"])
     if ck["model"] == "timegan":
-        nets = {"G": TGGenerator(), "S": TGSupervisor(), "R": TGRecovery(n_features=n_feat)}
+        zi = a.get("zero_inflated", False)
+        R = TGRecovery(n_features=n_feat + (1 if zi else 0))           # +1 channel: move logit
+        if zi:
+            cols = list(stats["mean"].index)
+            R = nn.Sequential(R, ZeroInflatedReturn(torch.tensor(stats["mean"].to_numpy()),
+                                                    torch.tensor(stats["std"].to_numpy()),
+                                                    ret_idx=cols.index("ret")))
         if a.get("constrained"):
-            nets["R"] = constrain(nets["R"], stats)
+            R = constrain(R, stats)
+        nets = {"G": TGGenerator(), "S": TGSupervisor(), "R": R}
     else:
         nets = {"G": RNNGenerator(n_features=n_feat)}
         if a.get("constrained"):
@@ -104,6 +112,7 @@ def load_generator(path: Path, device: str):
     def sample(n: int, seq_len: int, seed: int = 1234) -> torch.Tensor:
         """n normalised windows (n, seq_len, features), from noise drawn on the CPU."""
         g = torch.Generator().manual_seed(seed)
+        torch.manual_seed(seed)                     # the ZI gate's Bernoulli draws use the global RNG
         if ck["model"] == "timegan":
             z = torch.rand(n, seq_len, Z_DIM, generator=g).to(device)      # uniform noise, as in training
             return nets["R"](nets["S"](nets["G"](z))).cpu()
