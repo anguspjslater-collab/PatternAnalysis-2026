@@ -1,8 +1,16 @@
 #!/bin/bash
-# train.sh - Slurm job: train a model on one A100.
+# train.sh - Slurm job: train a model on one A100 on Rangpur.
+#
+# Author:  Angus Slater (s4961587)
+# Course:  COMP3710 Pattern Recognition, The University of Queensland, 2026
+# Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+#
 # Usage:  sbatch train.sh [train.py args]
 #   smoke:     sbatch --time=00:20:00 train.sh --epochs 3 --limit 4 --tag smoke
-#   baseline:  sbatch train.sh --model unet3d --epochs 150
+#   baseline:  sbatch train.sh --model unet3d --epochs 150 --tag baseline
+#
+# Arguments after the script name are passed straight to train.py.
+#SBATCH --job-name=unet3d
 #SBATCH --job-name=unet3d
 #SBATCH --partition=comp3710
 #SBATCH --account=comp3710

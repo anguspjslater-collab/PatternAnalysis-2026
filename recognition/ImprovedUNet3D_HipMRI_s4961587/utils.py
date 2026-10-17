@@ -1,5 +1,21 @@
 """
 utils.py - evaluation metric and plotting helpers shared by train.py and predict.py.
+
+Author: Angus Slater (s4961587)
+Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
+Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+
+Contents:
+- CLASS_NAMES: label index -> structure name (0 background ... 5 prostate).
+- dice_per_class: hard (argmax) Dice per class, the reported metric. Kept
+  separate from the soft Dice in the training loss: soft Dice uses
+  probabilities so it can be differentiated; hard Dice scores the actual
+  predicted mask, which is what a clinician would see.
+- plot_history: training curves (loss split into CE and Dice parts, plus
+  per-class validation Dice), saved to PNG every epoch.
+
+Matplotlib uses the non-interactive Agg backend: Rangpur compute nodes have
+no display, so figures are written to file instead of shown.
 """
 import matplotlib
 matplotlib.use("Agg")  # Rangpur compute nodes have no display; save figures to file

@@ -1,6 +1,10 @@
 """
 train.py - train a 3D U-Net on HipMRI, validate every epoch, keep the best model.
 
+Author: Angus Slater (s4961587)
+Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
+Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+
 Usage (on Rangpur, through train.sh):
     python train.py --model unet3d --epochs 150                      # full run
     python train.py --model unet3d --epochs 3 --limit 4 --tag smoke  # quick check

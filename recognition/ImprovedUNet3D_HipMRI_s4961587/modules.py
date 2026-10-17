@@ -1,6 +1,10 @@
 """
 modules.py - 3D U-Net segmentation model and loss for HipMRI prostate MRI.
 
+Author: Angus Slater (s4961587)
+Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
+Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+
 UNet3D: baseline from Cicek et al., 2016, "3D U-Net: Learning Dense Volumetric
 Segmentation from Sparse Annotation" (MICCAI). Four 2x down/up-sampling levels,
 16-32-64-128 channels with a 256-channel bottleneck.
@@ -53,7 +57,7 @@ class UNet3D(nn.Module):
     def __init__(self, in_ch=1, n_classes=6, base=16):
         super().__init__()
         c1, c2, c3, c4, c5 = (base * 2**i for i in range(5))  # 16, 32, 64, 128, 256
-        
+
         # max-pool layer used in research paper (Çiçek et al. (2016) - no trainable paramters
         self.pool = nn.MaxPool3d(2)
         self.enc1 = DoubleConv(in_ch, c1)

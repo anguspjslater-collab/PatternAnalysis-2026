@@ -1,6 +1,10 @@
 """
 dataset.py - HipMRI 3D prostate MRI loading, splitting and preprocessing.
 
+Author: Angus Slater (s4961587)
+Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
+Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+
 Data: HipMRI Study (Dowling et al., 2015, doi:10.1016/j.ijrobp.2015.08.045),
 read in place from /home/groups/comp3710/HipMRI_Study_open. 211 T2 MRI volumes
 from 38 patients (1-8 weekly scans each), 256x256x128, LPS orientation.
