@@ -6,11 +6,11 @@
 # Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 #
 # Usage:  sbatch train.sh [train.py args]
-#   smoke:     sbatch --time=00:20:00 train.sh --epochs 3 --limit 4 --tag smoke
-#   baseline:  sbatch train.sh --model unet3d --epochs 150 --tag baseline
+   #   smoke:     sbatch --time=00:20:00 train.sh --model improved --epochs 3 --limit 4 --tag smoke
+   #   baseline:  sbatch train.sh --model unet3d --epochs 150 --tag baseline
+   #   improved:  sbatch train.sh --model improved --epochs 150 --tag v1
 #
 # Arguments after the script name are passed straight to train.py.
-#SBATCH --job-name=unet3d
 #SBATCH --job-name=unet3d
 #SBATCH --partition=comp3710
 #SBATCH --account=comp3710

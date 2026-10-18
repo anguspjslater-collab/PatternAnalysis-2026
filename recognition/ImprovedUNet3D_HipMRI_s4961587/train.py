@@ -6,8 +6,9 @@ Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
 Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 
 Usage (on Rangpur, through train.sh):
-    python train.py --model unet3d --epochs 150                      # full run
-    python train.py --model unet3d --epochs 3 --limit 4 --tag smoke  # quick check
+    python train.py --model unet3d --epochs 150 --tag baseline       # baseline
+    python train.py --model improved --epochs 150 --tag v1           # Improved U-Net
+    python train.py --model improved --epochs 3 --limit 4 --tag smoke  # quick check
 
 Outputs, named <model>_<tag>:
     checkpoints/<run>.pt      best weights by validation prostate Dice
@@ -28,7 +29,7 @@ from modules import DiceCELoss, ImprovedUNet3D, UNet3D
 from utils import CLASS_NAMES, dice_per_class, plot_history
 
 MODELS = {"unet3d": UNet3D, "improved": ImprovedUNet3D}  # --model choices
-PROSTATE = 5                 # label index of the target class
+PROSTATE = 5 # label index of the target class
 
 
 def parse_args():
