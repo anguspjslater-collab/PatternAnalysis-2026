@@ -13,6 +13,10 @@ Contents:
   predicted mask, which is what a clinician would see.
 - plot_history: training curves (loss split into CE and Dice parts, plus
   per-class validation Dice), saved to PNG every epoch.
+- binary_dice: Dice of two boolean masks (NaN if both are empty).
+- hd95: 95th-percentile Hausdorff distance between mask surfaces, in mm.
+- dice_by_third: prostate Dice in the apex / mid / base thirds of its slices.
+- plot_overlay: axial + sagittal slices with truth (green) and prediction (red).
 
 Matplotlib uses the non-interactive Agg backend: Rangpur compute nodes have
 no display, so figures are written to file instead of shown.
@@ -20,7 +24,11 @@ no display, so figures are written to file instead of shown.
 import matplotlib
 matplotlib.use("Agg")  # Rangpur compute nodes have no display; save figures to file
 import matplotlib.pyplot as plt
+
 import torch
+import numpy as np
+
+from scipy import ndimage
 
 CLASS_NAMES = ["background", "body", "bone", "bladder", "rectum", "prostate"]
 
@@ -76,3 +84,87 @@ def plot_history(history, path):
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)  # free the figure: called every epoch, so open figures would pile up in memory
+
+
+# test-set metrics -------------------------------------------------------------
+def binary_dice(pred, gt):
+    """Dice of two boolean arrays; NaN if both are empty (Dice is undefined there)."""
+    total = pred.sum() + gt.sum()
+    return float(2 * (pred & gt).sum() / total) if total else float("nan")
+
+
+def hd95(pred, gt, spacing):
+    """95th-percentile symmetric Hausdorff distance between two masks' surfaces, in mm.
+
+    For every surface voxel of each mask, find the distance to the nearest surface
+    voxel of the other mask; HD95 is the 95th percentile of all those distances
+    (the max would be dominated by one stray voxel).
+
+    Args:
+        pred, gt: boolean (X, Y, Z) masks.
+        spacing: voxel size in mm per axis, so distances come out in mm.
+
+    Returns:
+        HD95 in mm; NaN if either mask is empty (distance undefined).
+    """
+    if not pred.any() or not gt.any():
+        return float("nan")
+    surf_p = pred & ~ndimage.binary_erosion(pred)  # boundary = mask minus its eroded interior
+    surf_g = gt & ~ndimage.binary_erosion(gt)
+    # distance_transform_edt gives, at every voxel, the distance to the nearest zero;
+    # zeros are placed on the other mask's surface.
+    dist_to_g = ndimage.distance_transform_edt(~surf_g, sampling=spacing)
+    dist_to_p = ndimage.distance_transform_edt(~surf_p, sampling=spacing)
+    d = np.concatenate([dist_to_g[surf_p], dist_to_p[surf_g]])
+    return float(np.percentile(d, 95))
+
+
+def dice_by_third(pred, gt):
+    """Prostate Dice in the apex / mid / base thirds of the slices that contain prostate.
+
+    Axis 2 runs foot -> head (LPS), so the lowest third of prostate slices is the
+    apex and the highest is the base.
+
+    Args:
+        pred, gt: boolean (X, Y, Z) prostate masks.
+
+    Returns:
+        {"apex": Dice, "mid": Dice, "base": Dice}, each pooled over that third's slices.
+    """
+    z = np.where(gt.any(axis=(0, 1)))[0]  # slice indices containing ground-truth prostate
+    if len(z) < 3:
+        return {"apex": float("nan"), "mid": float("nan"), "base": float("nan")}
+    thirds = np.array_split(z, 3)
+    return {name: binary_dice(pred[:, :, s], gt[:, :, s])
+            for name, s in zip(("apex", "mid", "base"), thirds)}
+
+
+def plot_overlay(img, gt, pred, title, path, cls=5):
+    """Axial and sagittal slices through the prostate centre: ground truth green, prediction red.
+
+    Args:
+        img: (X, Y, Z) image; gt, pred: (X, Y, Z) label volumes.
+        title: figure title (case name and scores).
+        path: output .png path.
+        cls: label to outline (5 = prostate).
+    """
+    g, p = gt == cls, pred == cls
+    if g.any():
+        cx, _, cz = (int(round(c)) for c in np.argwhere(g).mean(axis=0))
+    else:
+        cx, cz = img.shape[0] // 2, img.shape[2] // 2
+    views = [("axial", img[:, :, cz].T, g[:, :, cz].T, p[:, :, cz].T),
+             ("sagittal", img[cx].T, g[cx].T, p[cx].T)]
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
+    for ax, (name, im, gs, ps) in zip(axes, views):
+        ax.imshow(im, cmap="gray", origin="lower")
+        if gs.any():
+            ax.contour(gs, levels=[0.5], colors="lime", linewidths=1.2, origin="lower")
+        if ps.any():
+            ax.contour(ps, levels=[0.5], colors="red", linewidths=1.2, origin="lower")
+        ax.set_title(f"{name} (green = truth, red = prediction)", fontsize=9)
+        ax.axis("off")
+    fig.suptitle(title, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
