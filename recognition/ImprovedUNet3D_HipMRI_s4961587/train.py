@@ -43,7 +43,9 @@ def parse_args():
     p.add_argument("--limit", type=int, default=None, help="cap volumes per split (smoke tests)")
     p.add_argument("--augment", action="store_true", help="random left-right flips on train")
     p.add_argument("--num_workers", type=int, default=4, help="match --cpus-per-task")
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed", type=int, default=42, help="training randomness (init, batch order)")
+    p.add_argument("--split_seed", type=int, default=42,
+                   help="patient split seed; keep fixed so every run uses the same patients")
     p.add_argument("--tag", default="baseline", help="run name suffix")
     return p.parse_args()
 
@@ -127,7 +129,7 @@ def main():
     print(f"run {run} on {device} | {vars(args)}", flush=True)
 
     t0 = time.time()
-    loaders, _ = get_loaders(root=args.data_dir, batch_size=args.batch_size, seed=args.seed,
+    loaders, _ = get_loaders(root=args.data_dir, batch_size=args.batch_size, seed=args.split_seed,
                              num_workers=args.num_workers, augment=args.augment, limit=args.limit)
     sizes = ", ".join(f"{k} {len(v.dataset)}" for k, v in loaders.items())
     print(f"data loaded in {time.time() - t0:.0f}s ({sizes})", flush=True)
