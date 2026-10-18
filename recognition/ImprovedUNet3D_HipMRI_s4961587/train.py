@@ -25,10 +25,9 @@ import torch
 
 from dataset import NUM_CLASSES, ROOT, get_loaders
 from modules import DiceCELoss, ImprovedUNet3D, UNet3D
-MODELS = {"unet3d": UNet3D, "improved": ImprovedUNet3D}
 from utils import CLASS_NAMES, dice_per_class, plot_history
 
-MODELS = {"unet3d": UNet3D}  # ImprovedUNet3D gets added here later
+MODELS = {"unet3d": UNet3D, "improved": ImprovedUNet3D}  # --model choices
 PROSTATE = 5                 # label index of the target class
 
 
