@@ -1,14 +1,24 @@
 """
-modules.py - 3D U-Net segmentation model and loss for HipMRI prostate MRI.
+modules.py - 3D U-Net models and loss for HipMRI prostate MRI segmentation.
 
 Author: Angus Slater (s4961587)
 Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
 Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 
-UNet3D: baseline from Cicek et al., 2016, "3D U-Net: Learning Dense Volumetric
-Segmentation from Sparse Annotation" (MICCAI). Four 2x down/up-sampling levels,
-16-32-64-128 channels with a 256-channel bottleneck.
-ImprovedUNet3D (Isensee et al., 2017) will be added here later.
+Models:
+- UNet3D (baseline): Cicek et al., 2016, "3D U-Net: Learning Dense Volumetric
+  Segmentation from Sparse Annotation" (MICCAI). Four 2x levels, max-pool down,
+  transposed-conv up, DoubleConv blocks, 16-32-64-128-256 channels. ~5.6M params.
+- ImprovedUNet3D (proposed): Isensee et al., 2017, "Brain Tumor Segmentation and
+  Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge".
+  Residual context modules with dropout, stride-2 conv downsampling, LeakyReLU,
+  upsample+conv, localisation modules and deep supervision. ~9.5M params.
+
+Both use InstanceNorm (batch size 2 makes BatchNorm statistics unreliable) and
+the same loss, so the architecture is the only difference between them.
+
+Loss: DiceCELoss = cross-entropy + (1 - soft Dice averaged over classes);
+soft Dice from Milletari et al., 2016, "V-Net" (3DV).
 
 Input:  (B, 1, X, Y, Z), each spatial size divisible by 16 (we use 128x128x64).
 Output: (B, 6, X, Y, Z) raw logits; softmax is applied in the loss and at inference.
@@ -53,7 +63,6 @@ class UNet3D(nn.Module):
         n_classes: output classes (6: background + 5 structures).
         base: channels at the first level; doubled at each level down.
     """
-
     def __init__(self, in_ch=1, n_classes=6, base=16):
         super().__init__()
         c1, c2, c3, c4, c5 = (base * 2**i for i in range(5))  # 16, 32, 64, 128, 256
@@ -91,6 +100,140 @@ class UNet3D(nn.Module):
         return self.out(d1) # (B, 6, 128, 128, 64)
 
 
+def conv_norm_act(in_ch, out_ch, k=3, stride=1):
+    """Conv3d -> InstanceNorm -> LeakyReLU, the Improved U-Net's basic layer.
+
+    Args:
+        in_ch, out_ch: input / output channels.
+        k: kernel size (3, or 1 for a 1x1x1 channel-mixing conv).
+        stride: 1 keeps the size; 2 halves it (learned downsampling).
+    """
+    return nn.Sequential(
+        nn.Conv3d(in_ch, out_ch, k, stride=stride, padding=k // 2, bias=False),
+        nn.InstanceNorm3d(out_ch, affine=True),
+        nn.LeakyReLU(0.01, inplace=True),  # small negative slope: no "dead" units
+    )
+
+
+class ContextModule(nn.Module):
+    """Residual encoder block (Isensee et al., 2017):
+    x + [IN -> LeakyReLU -> conv -> dropout -> IN -> LeakyReLU -> conv](x).
+
+    The identity path lets gradients bypass the convs (He et al., 2016), so the
+    block only has to learn a correction to its input. Shape unchanged.
+
+    Args:
+        ch: channels in and out.
+        p_drop: dropout probability between the convs (regularisation).
+    """
+    def __init__(self, ch, p_drop=0.3):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.InstanceNorm3d(ch, affine=True), nn.LeakyReLU(0.01),
+            nn.Conv3d(ch, ch, 3, padding=1, bias=False),
+            nn.Dropout3d(p_drop),  # drops whole feature maps, active only in model.train()
+            nn.InstanceNorm3d(ch, affine=True), nn.LeakyReLU(0.01),
+            nn.Conv3d(ch, ch, 3, padding=1, bias=False),
+        )
+
+    def forward(self, x):
+        """(B, ch, X, Y, Z) -> (B, ch, X, Y, Z)."""
+        return x + self.block(x)  # residual connection
+
+
+class UpModule(nn.Module):
+    """Upsample 2x (trilinear), then conv to halve the channels.
+
+    Used instead of a transposed conv to avoid checkerboard artefacts.
+
+    Args:
+        in_ch, out_ch: input / output channels.
+    """
+
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.conv = conv_norm_act(in_ch, out_ch)
+
+    def forward(self, x):
+        """(B, in_ch, X, Y, Z) -> (B, out_ch, 2X, 2Y, 2Z)."""
+        return self.conv(F.interpolate(x, scale_factor=2, mode="trilinear", align_corners=False))
+
+
+class LocalisationModule(nn.Module):
+    """Decoder block: 3x3x3 conv merges skip + upsampled features, 1x1x1 conv halves channels.
+
+    Args:
+        in_ch: channels after concatenation (skip + upsampled).
+        out_ch: output channels (in_ch / 2).
+    """
+
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.block = nn.Sequential(conv_norm_act(in_ch, in_ch), conv_norm_act(in_ch, out_ch, k=1))
+
+    def forward(self, x):
+        """(B, in_ch, X, Y, Z) -> (B, out_ch, X, Y, Z)."""
+        return self.block(x)
+
+
+class ImprovedUNet3D(nn.Module):
+    """Improved 3D U-Net (Isensee et al., 2017, "Brain Tumor Segmentation and
+    Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge").
+
+    Differences from UNet3D: residual context modules, stride-2 conv downsampling,
+    LeakyReLU, upsample+conv, localisation modules, and deep supervision.
+
+    Args:
+        in_ch: input channels (1 for single-sequence MRI).
+        n_classes: output classes (6).
+        base: channels at the first level; doubled at each level down.
+    """
+
+    def __init__(self, in_ch=1, n_classes=6, base=16):
+        super().__init__()
+        c1, c2, c3, c4, c5 = (base * 2**i for i in range(5))  # 16, 32, 64, 128, 256
+
+        # Encoder: level 1 at full size, then stride-2 conv + context module per level.
+        self.stem = nn.Conv3d(in_ch, c1, 3, padding=1, bias=False)
+        self.ctx1 = ContextModule(c1)
+        self.down2, self.ctx2 = conv_norm_act(c1, c2, stride=2), ContextModule(c2)
+        self.down3, self.ctx3 = conv_norm_act(c2, c3, stride=2), ContextModule(c3)
+        self.down4, self.ctx4 = conv_norm_act(c3, c4, stride=2), ContextModule(c4)
+        self.down5, self.ctx5 = conv_norm_act(c4, c5, stride=2), ContextModule(c5)
+
+        # Decoder: upsample (halve channels), concat skip (doubles back), localise (halve).
+        self.up4, self.loc4 = UpModule(c5, c4), LocalisationModule(c5, c4)
+        self.up3, self.loc3 = UpModule(c4, c3), LocalisationModule(c4, c3)
+        self.up2, self.loc2 = UpModule(c3, c2), LocalisationModule(c3, c2)
+        self.up1, self.final = UpModule(c2, c1), conv_norm_act(c2, c2)
+
+        # Deep supervision: 1x1x1 segmentation heads at three decoder levels.
+        self.seg3 = nn.Conv3d(c3, n_classes, 1)  # 1/4 resolution
+        self.seg2 = nn.Conv3d(c2, n_classes, 1)  # 1/2 resolution
+        self.seg1 = nn.Conv3d(c2, n_classes, 1)  # full resolution
+
+    def forward(self, x):
+        """(B, 1, X, Y, Z) -> (B, n_classes, X, Y, Z) logits."""
+        e1 = self.ctx1(self.stem(x))            # (B, 16, 128, 128, 64)
+        e2 = self.ctx2(self.down2(e1))          # (B, 32,  64,  64, 32)
+        e3 = self.ctx3(self.down3(e2))          # (B, 64,  32,  32, 16)
+        e4 = self.ctx4(self.down4(e3))          # (B, 128, 16,  16,  8)
+        b = self.ctx5(self.down5(e4))           # (B, 256,  8,   8,  4)
+
+        d4 = self.loc4(torch.cat([self.up4(b), e4], dim=1))   # (B, 128, 16, 16,  8)
+        d3 = self.loc3(torch.cat([self.up3(d4), e3], dim=1))  # (B, 64,  32, 32, 16)
+        d2 = self.loc2(torch.cat([self.up2(d3), e2], dim=1))  # (B, 32,  64, 64, 32)
+        d1 = self.final(torch.cat([self.up1(d2), e1], dim=1)) # (B, 32, 128, 128, 64)
+
+        # Deep supervision: coarse segmentations are upsampled and summed into finer ones,
+        # so deep decoder levels get a short gradient path from the loss.
+        up = lambda t: F.interpolate(t, scale_factor=2, mode="trilinear", align_corners=False)
+        s = self.seg3(d3)
+        s = up(s) + self.seg2(d2)
+        s = up(s) + self.seg1(d1)
+        return s               # (B, 6, 128, 128, 64)
+
+
 class DiceCELoss(nn.Module):
     """Cross-entropy + (1 - soft Dice averaged over classes).
 
@@ -102,7 +245,6 @@ class DiceCELoss(nn.Module):
         n_classes: number of classes.
         eps: smoothing term so empty classes don't divide by zero.
     """
-
     def __init__(self, n_classes=6, eps=1e-5):
         super().__init__()
         self.n_classes, self.eps = n_classes, eps
@@ -125,11 +267,11 @@ class DiceCELoss(nn.Module):
 
 
 if __name__ == "__main__":
-    # Shape test on CPU: random input -> correct output shape, parameter count, loss runs.
-    model = UNet3D()
+    # Shape test on CPU for both models: output shape, parameter count, loss runs.
     x = torch.randn(1, 1, 128, 128, 64)
-    y = model(x)
-    print("output", tuple(y.shape))
-    print(f"parameters: {sum(p.numel() for p in model.parameters()):,}")
     target = torch.randint(0, 6, (1, 128, 128, 64))
-    print(f"loss on random data: {DiceCELoss()(y, target).item():.3f}")
+    for model in (UNet3D(), ImprovedUNet3D()):
+        y = model(x)
+        print(f"{type(model).__name__}: output {tuple(y.shape)}, "
+            f"{sum(p.numel() for p in model.parameters()):,} params, "
+            f"loss {DiceCELoss()(y, target).item():.3f}")
