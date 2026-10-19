@@ -41,6 +41,8 @@ def parse_args():
     p.add_argument("--data_dir", default=ROOT, help="folder containing semantic_MRs/")
     p.add_argument("--split_seed", type=int, default=42, help="must match training")
     p.add_argument("--n_overlays", type=int, default=4, help="worst cases to plot (+ the best)")
+    p.add_argument("--cases", nargs="*", default=None,
+                help="specific cases to overlay, e.g. T014_Week7 K008_Week0 (default: worst + best)")
     return p.parse_args()
 
 
@@ -102,6 +104,8 @@ def main():
             "prostate_hd95_mm": hd95(p_pro, g_pro, downsampled_spacing(img_path)),
             "prostate_dice_thirds": dice_by_third(p_pro, g_pro),
             "infer_ms": ms,
+            "prostate_gt_voxels": int(g_pro.sum()),
+            "prostate_pred_voxels": int(p_pro.sum()),  # > gt means over-segmentation
         })
         preds.append(pred)
         r = rows[-1]
@@ -127,7 +131,10 @@ def main():
 
     # Overlays: the worst cases by prostate Dice (failure autopsy) plus the best for contrast.
     order = np.argsort([r["prostate_dice"] for r in rows])  # ascending: worst first
-    picks = list(order[:args.n_overlays]) + [order[-1]]
+    if args.cases:
+        picks = [i for i, r in enumerate(rows) if r["case"] in args.cases]
+    else:
+        picks = list(order[:args.n_overlays]) + [order[-1]]
     for i in picks:
         r = rows[i]
         title = (f"{run} | {r['case']} | prostate Dice {r['prostate_dice']:.3f}, "
