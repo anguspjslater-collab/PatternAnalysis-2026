@@ -6,8 +6,9 @@ Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
 Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 
 Usage (on Rangpur, through train.sh):
-    python train.py --model unet3d --epochs 150 --tag baseline       # baseline
-    python train.py --model improved --epochs 150 --tag v1           # Improved U-Net
+    python train.py --model unet2d --epochs 150 --tag v1             # 2D control
+    python train.py --model unet3d --epochs 150 --tag baseline       # 3D baseline
+    python train.py --model improved --epochs 150 --tag v1           # Improved 3D U-Net
     python train.py --model improved --epochs 3 --limit 4 --tag smoke  # quick check
 
 Outputs, named <model>_<tag>:

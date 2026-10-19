@@ -6,6 +6,10 @@ Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
 Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 
 Models:
+- UNet2D (2D control): slice-wise 2D U-Net (Ronneberger et al., 2015, "U-Net:
+  Convolutional Networks for Biomedical Image Segmentation", MICCAI). Same layout
+  and widths as UNet3D with 2D layers; each axial slice is segmented independently,
+  so it has no inter-slice context. Isolates the value of 3D context. ~1.9M params.
 - UNet3D (baseline): Cicek et al., 2016, "3D U-Net: Learning Dense Volumetric
   Segmentation from Sparse Annotation" (MICCAI). Four 2x levels, max-pool down,
   transposed-conv up, DoubleConv blocks, 16-32-64-128-256 channels. ~5.6M params.
@@ -14,8 +18,9 @@ Models:
   Residual context modules with dropout, stride-2 conv downsampling, LeakyReLU,
   upsample+conv, localisation modules and deep supervision. ~9.5M params.
 
-Both use InstanceNorm (batch size 2 makes BatchNorm statistics unreliable) and
-the same loss, so the architecture is the only difference between them.
+All three use InstanceNorm (batch size 2 makes BatchNorm statistics unreliable),
+take and return whole volumes, and share the same loss and training setup, so
+the architecture is the only difference between them.
 
 Loss: DiceCELoss = cross-entropy + (1 - soft Dice averaged over classes);
 soft Dice from Milletari et al., 2016, "V-Net" (3DV).
