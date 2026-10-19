@@ -234,6 +234,73 @@ class ImprovedUNet3D(nn.Module):
         return s               # (B, 6, 128, 128, 64)
 
 
+class DoubleConv2D(nn.Module):
+    """2D version of DoubleConv: two [3x3 conv -> InstanceNorm -> ReLU] layers."""
+
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1, bias=False),
+            nn.InstanceNorm2d(out_ch, affine=True), nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False),
+            nn.InstanceNorm2d(out_ch, affine=True), nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        """(N, in_ch, X, Y) -> (N, out_ch, X, Y)."""
+        return self.block(x)
+
+
+class UNet2D(nn.Module):
+    """Slice-wise 2D U-Net (Ronneberger et al., 2015): the 2D-vs-3D control.
+
+    Same layout and widths as UNet3D but with 2D layers. Each axial slice is
+    segmented independently (no inter-slice context), so comparing it with the
+    3D models isolates the value of 3D context at the prostate base and apex.
+    Takes and returns whole volumes, so train.py / predict.py need no changes.
+
+    Args:
+        in_ch: input channels (1).
+        n_classes: output classes (6).
+        base: channels at the first level; doubled at each level down.
+    """
+
+    def __init__(self, in_ch=1, n_classes=6, base=16):
+        super().__init__()
+        c1, c2, c3, c4, c5 = (base * 2**i for i in range(5))  # 16, 32, 64, 128, 256
+        self.pool = nn.MaxPool2d(2)
+        self.enc1, self.enc2 = DoubleConv2D(in_ch, c1), DoubleConv2D(c1, c2)
+        self.enc3, self.enc4 = DoubleConv2D(c2, c3), DoubleConv2D(c3, c4)
+        self.bottleneck = DoubleConv2D(c4, c5)
+        self.up4, self.dec4 = nn.ConvTranspose2d(c5, c4, 2, stride=2), DoubleConv2D(c5, c4)
+        self.up3, self.dec3 = nn.ConvTranspose2d(c4, c3, 2, stride=2), DoubleConv2D(c4, c3)
+        self.up2, self.dec2 = nn.ConvTranspose2d(c3, c2, 2, stride=2), DoubleConv2D(c3, c2)
+        self.up1, self.dec1 = nn.ConvTranspose2d(c2, c1, 2, stride=2), DoubleConv2D(c2, c1)
+        self.out = nn.Conv2d(c1, n_classes, 1)
+
+    def forward_2d(self, x):
+        """Standard 2D U-Net on a stack of slices: (N, 1, X, Y) -> (N, n_classes, X, Y)."""
+        e1 = self.enc1(x)
+        e2 = self.enc2(self.pool(e1))
+        e3 = self.enc3(self.pool(e2))
+        e4 = self.enc4(self.pool(e3))
+        b = self.bottleneck(self.pool(e4))
+        d4 = self.dec4(torch.cat([self.up4(b), e4], dim=1))
+        d3 = self.dec3(torch.cat([self.up3(d4), e3], dim=1))
+        d2 = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
+        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
+        return self.out(d1)
+
+    def forward(self, x):
+        """(B, 1, X, Y, Z) volume -> (B, n_classes, X, Y, Z), each axial slice processed alone."""
+        B, C, X, Y, Z = x.shape
+        # Move the slice axis Z next to the batch, then merge them: every slice becomes
+        # its own 2D sample, so the network never sees neighbouring slices.
+        slices = x.permute(0, 4, 1, 2, 3).reshape(B*Z, C, X, Y)   # (B*Z, 1, X, Y)
+        out = self.forward_2d(slices)                              # (B*Z, 6, X, Y)
+        return out.reshape(B, Z, -1, X, Y).permute(0, 2, 3, 4, 1)  # (B, 6, X, Y, Z)
+
+
 class DiceCELoss(nn.Module):
     """Cross-entropy + (1 - soft Dice averaged over classes).
 
@@ -270,7 +337,7 @@ if __name__ == "__main__":
     # Shape test on CPU for both models: output shape, parameter count, loss runs.
     x = torch.randn(1, 1, 128, 128, 64)
     target = torch.randint(0, 6, (1, 128, 128, 64))
-    for model in (UNet3D(), ImprovedUNet3D()):
+    for model in (UNet2D(), UNet3D(), ImprovedUNet3D()):
         y = model(x)
         print(f"{type(model).__name__}: output {tuple(y.shape)}, "
             f"{sum(p.numel() for p in model.parameters()):,} params, "
