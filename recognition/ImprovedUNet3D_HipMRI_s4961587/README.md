@@ -271,6 +271,92 @@ axis. All models infer in under 30 ms per volume on one A100.
 
 ## 7. Failure Autopsy
 
+## 7. Failure autopsy
+
+Five test volumes were examined: the four with the lowest prostate Dice, plus the
+best case (V027_Week7) for contrast. Each figure shows an axial and a sagittal slice
+through the prostate: input | ground truth (green) | prediction (yellow) |
+error map (red = false positive, blue = false negative). In the sagittal view, anterior is left
+and superior (base, towards the bladder) is up. Figures for all three models are in
+`figures/overlay_<model>_<case>.png`; the Improved model's figures are shown below.
+
+| Case | 2D Dice / HD95 | 3D Dice / HD95 | Improved Dice / HD95 | Failure mode |
+| --- | --- | --- | --- | --- |
+| K008_Week0 | 0.769 / 10.6 mm | 0.776 / 8.7 mm | **0.816 / 6.2 mm** | Apex missed, base over-extended |
+| K018_Week7 | 0.693 / 7.8 mm | **0.773 / 7.1 mm** | 0.756 / 7.1 mm | Whole gland under-segmented |
+| T014_Week2 | 0.671 / 9.4 mm | 0.763 / 6.2 mm | **0.790 / 6.2 mm** | Bleeds into bladder neck, apex missed |
+| T014_Week7 | 0.736 / 7.1 mm | 0.758 / 6.2 mm | **0.815 / 4.6 mm** | Bleeds into bladder neck, apex missed |
+| V027_Week7 | 0.876 / 3.4 mm | **0.926 / 3.1 mm** | 0.914 / 3.4 mm | Success: one-voxel boundary rim only |
+
+### 7.1 K008_Week0: prediction shifted towards the base
+
+![K008](figures/overlay_improved_v1_K008_Week0.png)
+
+All three models place the gland too far superiorly: there is a band of false
+negatives across the inferior apex and a thinner false-positive cap at the base,
+next to the bladder. The 2D model also predicts a separate island of prostate near
+the bladder neck, several slices above the gland. That single blob drives its HD95
+to 10.6 mm. The blob is the kind of error a slice-by-slice model makes, because no slice
+"knows" the gland ended below it. The 3D models remove the island, and the Improved
+model shrinks the apex miss (HD95 10.6 → 8.7 → 6.2 mm), matching its apex gain in
+Section 6.3.
+
+### 7.2 K018_Week7: systematic under-segmentation
+
+![K018](figures/overlay_improved_v1_K018_Week7.png)
+
+This is a large gland in a low-contrast scan. Every model draws it too small: the axial
+error map is an almost continuous blue ring, and in sagittal the base is cut off (blue,
+top) while the prediction pokes slightly below the true apex (red, bottom). The gland
+edge blends into the surrounding tissue, so the models fall back on a "typical"
+prostate size learned from training data. This is the only case below the 0.70
+target (2D, 0.693), and the only failure case where the Improved model is worse than
+the 3D baseline (0.756 vs 0.773). Deep supervision rewards getting the coarse shape
+right, which may pull predictions towards an average-sized gland.
+
+### 7.3 T014 (Weeks 2 and 7): small gland next to the bladder neck
+
+![T014 Week 7](figures/overlay_improved_v1_T014_Week7.png)
+
+Patient T014 provides two of the five worst cases. The gland is small and sits directly
+under a bright, fluid-filled bladder neck. In both scans the models continue the
+prostate upwards into the bladder neck (red at the top of the sagittal view) and miss
+part of the apex (blue at the bottom). A small gland is hit hardest: a one-voxel (~3 mm)
+boundary error is a large fraction of its volume, so Dice falls quickly.
+The failure appears in Week 2 and Week 7, so it follows the patient's anatomy rather
+than the stage of treatment. The 2D model is worst (0.671 at Week 2); the Improved
+model is best on both scans and cuts HD95 to 4.6 mm at Week 7.
+
+### 7.4 V027_Week7: what success looks like
+
+![V027](figures/overlay_improved_v1_V027_Week7.png)
+
+This is a large, well-defined gland with a full bladder above it, so the base boundary has
+strong contrast. All models score ≥ 0.876, and the only errors are a scattered rim one
+voxel wide. The HD95 of 3.1–3.4 mm is about a single downsampled voxel, which is the
+practical floor at this resolution.
+
+### 7.5 Patterns
+
+1. **The errors are at the ends of the gland.** In every failure, the errors lie at the
+   superior (base / bladder neck) and inferior (apex) boundaries, not in the middle.
+   This matches the per-third Dice in Section 6.3.
+2. **The base is over-segmented and the apex under-segmented.** The predicted gland
+   is shifted or stretched towards the bladder. The bladder-neck interface is ambiguous
+   at ~3 mm voxels.
+3. **Small and low-contrast glands fail; size and contrast matter more than the
+   treatment week.**
+4. **3D context fixes 2D's disconnected false positives** (K008), but does not
+   fix a boundary that is unclear in the image itself (K018).
+5. **HD95 moves in voxel-sized steps** (3.1, 6.2 mm …), so differences under
+   ~3 mm are within one voxel and should not be over-interpreted.
+
+**What would likely help:** training at full resolution on a crop around the prostate
+(e.g. a two-stage cascade), so a one-voxel error is ~1.6 mm instead of ~3.1 mm; a
+boundary-aware loss (e.g. a distance-based loss); and more training examples of small
+glands. Given these results, the base and apex of any automated contour should be
+reviewed manually (see Section 8).
+
 ## 8. Recommendation and Trade-Offs
 
 ## 9. Limitations and Future Work
