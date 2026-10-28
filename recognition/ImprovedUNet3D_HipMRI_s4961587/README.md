@@ -211,9 +211,63 @@ A100, while the loss is computed in fp32 for numerical precision. For the 2D mod
 computed on the restacked volume, so all three models receive an identical training signal.
 
 ## 6. Results
-### 6.1 Validation 
-### 6.2 Test Set
-### 6.3 Resources
+
+### 6.1 Validation (3 training seeds per model)
+
+| Model | Val prostate Dice (mean ± std) | Best epochs | Train time | Peak VRAM (train) | Params |
+| --- | --- | --- | --- | --- | --- |
+| 2D U-Net | 0.836 ± 0.004 | 20, 26, 66 | 10.0 min | 1.82 GB | 1.9M |
+| 3D U-Net | 0.868 ± 0.002 | 32, 60, 75 | 13.6 min | 1.38 GB | 5.6M |
+| Improved 3D U-Net | 0.870 ± 0.001 | 81, 83, 97 | 16.9 min | 2.36 GB | 9.5M |
+
+Moving from 2D to 3D adds +0.032 validation prostate Dice (~10x the seed-to-seed spread);
+the Improved model adds only +0.002 over the 3D baseline, within seed noise. The best epoch
+rises with model complexity: the 2D model peaks earliest and then overfits, while dropout and
+deep supervision let the Improved model keep improving until epochs 81–97.
+
+### 6.2 Test set (35 volumes, 7 patients; evaluated once)
+
+| Class | 2D U-Net Dice / IoU | 3D U-Net Dice / IoU | Improved 3D Dice / IoU |
+| --- | --- | --- | --- |
+| Body | 0.982 / 0.965 | 0.986 / 0.972 | 0.987 / 0.975 |
+| Bone | 0.910 / 0.835 | 0.921 / 0.855 | 0.925 / 0.862 |
+| Bladder | 0.912 / 0.845 | 0.929 / 0.874 | 0.938 / 0.888 |
+| Rectum | 0.825 / 0.709 | 0.858 / 0.756 | 0.866 / 0.767 |
+| **Prostate** | **0.787 ± 0.072 / 0.655** | **0.842 ± 0.051 / 0.730** | **0.849 ± 0.044 / 0.740** |
+| Prostate HD95 (mm) | 6.8 ± 3.0 | 5.3 ± 2.3 | 4.7 ± 1.3 |
+
+All three models meet the ≥ 0.70 prostate Dice target. 3D context improves every class,
+most for the small, low-contrast structures (prostate +0.055, rectum +0.033), and reduces both
+the mean and the spread of prostate HD95. IoU is computed per volume as Dice / (2 − Dice).
+
+### 6.3 Base and apex: the boundary dilemma
+
+| Prostate Dice by third | Apex | Mid | Base |
+| --- | --- | --- | --- |
+| 2D U-Net | 0.766 | 0.858 | 0.775 |
+| 3D U-Net | 0.805 | 0.898 | 0.813 |
+| Improved 3D U-Net | **0.839** | 0.896 | 0.805 |
+
+![Prostate Dice by third](figures/prostate_dice_by_third.png)
+
+All models are ~0.08–0.09 Dice worse at the apex and base than in the middle of the gland,
+which the global Dice score hides. 3D context raises all three thirds by a similar amount
+(~+0.04), so it improves the model overall but does not by itself close the gap at the ends.
+The Improved model's only clear gain over the 3D baseline is at the apex (+0.034); its base
+is no better.
+
+### 6.4 Resources
+
+| Model | Params | Train time (150 ep) | Peak VRAM train | Inference / volume | Peak VRAM inference |
+| --- | --- | --- | --- | --- | --- |
+| 2D U-Net | 1.9M | 10.0 min | 1.82 GB | 11 ms | 0.34 GB |
+| 3D U-Net | 5.6M | 13.6 min | 1.38 GB | 23 ms | 0.32 GB |
+| Improved 3D U-Net | 9.5M | 16.9 min | 2.36 GB | 27 ms | 0.48 GB |
+
+At this downsampled resolution, 3D costs ~1.4–1.7x the 2D training time and far less than the
+"5–10x" the task anticipated; the 3D baseline even uses less training memory than the 2D model,
+because the 2D network keeps all 64 slices at every level while 3D pooling also halves the slice
+axis. All models infer in under 30 ms per volume on one A100.
 
 ## 7. Failure Autopsy
 
