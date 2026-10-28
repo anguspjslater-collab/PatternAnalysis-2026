@@ -561,7 +561,6 @@ ImprovedUNet3D_HipMRI_s4961587/
 ├── checkpoints/        # model weights (git-ignored)
 ├── README.md           # md report file
 └── .gitignore
-
 ```
 
 ## 11. AI Usage Disclosure
@@ -600,26 +599,7 @@ decisions on models and evaluation, and verified all results. I have reviewed al
 AI-assisted code and text, and I can explain every part of it, including the
 architectures, the training setup, the metrics and the failure analysis.
 
-## Appendix
-
-## Appendix A. Architecture diagrams
-
-Shapes are (channels · X×Y×Z) for one scan; the batch dimension is omitted. Diagrams
-were generated with AI assistance from the model code in `modules.py`.
-
-![Figure A1: 2D U-Net](figures/appendixA_unet2d.png)
-*Figure A1: Control 2D U-Net (1.9M parameters). Each of the 64 axial slices is
-segmented independently, then the predictions are restacked into a volume.*
-
-![Figure A2: 3D U-Net](figures/appendixA_unet3d.png)
-*Figure A2: Baseline 3D U-Net (5.6M parameters), after Çiçek et al. (2016).*
-
-![Figure A3: Improved 3D U-Net](figures/appendixA_improved.png)
-*Figure A3: Improved 3D U-Net (9.5M parameters), after Isensee et al. (2018).
-Residual context modules, localisation modules, and deep supervision (seg1–seg3,
-upsampled and summed).*
-
-## 13. Data acknowledgement and references
+## 12. Data acknowledgement and references
 
 ### Data acknowledgement
 
@@ -683,3 +663,20 @@ https://doi.org/10.1007/978-3-319-24574-4_28
 
 Ulyanov, D., Vedaldi, A., & Lempitsky, V. (2016). Instance normalization: The missing
 ingredient for fast stylization. *arXiv preprint*. https://arxiv.org/abs/1607.08022
+
+## Appendix A. Architecture diagrams
+
+Shapes are (channels · spatial size) for one scan; the batch dimension is omitted. Diagrams
+were generated with AI assistance from the model code in `modules.py`.
+
+![Figure A1: 2D U-Net](figures/appendixA_unet2d.png)
+*Figure A1: Control 2D U-Net (1.9M parameters). Each of the 64 axial slices is
+segmented independently, then the predictions are restacked into a volume.*
+
+![Figure A2: 3D U-Net](figures/appendixA_unet3d.png)
+*Figure A2: Baseline 3D U-Net (5.6M parameters), after Çiçek et al. (2016).*
+
+![Figure A3: Improved 3D U-Net](figures/appendixA_improved.png)
+*Figure A3: Improved 3D U-Net (9.5M parameters), after Isensee et al. (2018).
+Residual context modules, localisation modules, and deep supervision (seg1–seg3,
+upsampled and summed).*
