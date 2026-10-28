@@ -140,13 +140,17 @@ def dice_by_third(pred, gt):
 
 
 def plot_overlay(img, gt, pred, title, path, cls=5):
-    """Axial and sagittal slices through the prostate centre: ground truth green, prediction red.
+    """4-panel failure view through the prostate centre, for axial and sagittal slices.
+
+    Columns: input image | ground truth | prediction | difference map, where
+    red = false positive (predicted prostate, not true) and blue = false negative
+    (true prostate missed). Spec 2.2 asks for exactly these panels.
 
     Args:
         img: (X, Y, Z) image; gt, pred: (X, Y, Z) label volumes.
         title: figure title (case name and scores).
         path: output .png path.
-        cls: label to outline (5 = prostate).
+        cls: label to analyse (5 = prostate).
     """
     g, p = gt == cls, pred == cls
     if g.any():
@@ -155,16 +159,25 @@ def plot_overlay(img, gt, pred, title, path, cls=5):
         cx, cz = img.shape[0] // 2, img.shape[2] // 2
     views = [("axial", img[:, :, cz].T, g[:, :, cz].T, p[:, :, cz].T),
              ("sagittal", img[cx].T, g[cx].T, p[cx].T)]
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
-    for ax, (name, im, gs, ps) in zip(axes, views):
-        ax.imshow(im, cmap="gray", origin="lower")
-        if gs.any():
-            ax.contour(gs, levels=[0.5], colors="lime", linewidths=1.2, origin="lower")
-        if ps.any():
-            ax.contour(ps, levels=[0.5], colors="red", linewidths=1.2, origin="lower")
-        ax.set_title(f"{name} (green = truth, red = prediction)", fontsize=9)
-        ax.axis("off")
+
+    def rgba(mask, colour):
+        """Transparent everywhere except mask, which gets the given RGB colour."""
+        out = np.zeros(mask.shape + (4,))
+        out[mask] = (*colour, 0.6)
+        return out
+
+    fig, axes = plt.subplots(2, 4, figsize=(14, 7))
+    for row, (name, im, gs, ps) in zip(axes, views):
+        diff = rgba(ps & ~gs, (1, 0, 0)) + rgba(gs & ~ps, (0, 0.4, 1))  # FP red, FN blue
+        panels = [("input", None), ("ground truth", rgba(gs, (0, 1, 0))),
+                  ("prediction", rgba(ps, (1, 1, 0))), ("FP red / FN blue", diff)]
+        for ax, (label, overlay) in zip(row, panels):
+            ax.imshow(im, cmap="gray", origin="lower")
+            if overlay is not None:
+                ax.imshow(overlay, origin="lower")
+            ax.set_title(f"{name}: {label}", fontsize=9)
+            ax.axis("off")
     fig.suptitle(title, fontsize=10)
     fig.tight_layout()
-    fig.savefig(path, dpi=120)
+    fig.savefig(path, dpi=110)
     plt.close(fig)

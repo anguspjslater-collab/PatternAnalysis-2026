@@ -100,12 +100,13 @@ def main():
         rows.append({
             "case": os.path.basename(img_path).replace("_LFOV.nii.gz", ""),
             "dice": dict(zip(CLASS_NAMES, dice)),
+            "iou": {c: d / (2 - d) for c, d in zip(CLASS_NAMES, dice)}, #Dice / (2 - Dice) holds exactly for each binary mask pair
             "prostate_dice": binary_dice(p_pro, g_pro),
             "prostate_hd95_mm": hd95(p_pro, g_pro, downsampled_spacing(img_path)),
             "prostate_dice_thirds": dice_by_third(p_pro, g_pro),
             "infer_ms": ms,
             "prostate_gt_voxels": int(g_pro.sum()),
-            "prostate_pred_voxels": int(p_pro.sum()),  # > gt means over-segmentation
+            "prostate_pred_voxels": int(p_pro.sum())  # > gt means over-segmentation
         })
         preds.append(pred)
         r = rows[-1]
@@ -120,6 +121,7 @@ def main():
     summary = {
         "run": run, "n_test_volumes": len(rows),
         "dice": {c: stat([r["dice"][c] for r in rows]) for c in CLASS_NAMES},
+        "iou": {c: stat([r["iou"][c] for r in rows]) for c in CLASS_NAMES},
         "prostate_hd95_mm": stat([r["prostate_hd95_mm"] for r in rows]),
         "prostate_dice_thirds": {t: stat([r["prostate_dice_thirds"][t] for r in rows])
                                  for t in ("apex", "mid", "base")},
@@ -145,7 +147,8 @@ def main():
     d, h, t = summary["dice"], summary["prostate_hd95_mm"], summary["prostate_dice_thirds"]
     print("\nTEST SET (mean ± std over volumes)")
     for c in CLASS_NAMES[1:]:
-        print(f"  {c:9s} Dice {d[c]['mean']:.3f} ± {d[c]['std']:.3f}")
+        print(f"  {c:9s} Dice {d[c]['mean']:.3f} ± {d[c]['std']:.3f} | "
+            f"IoU {summary['iou'][c]['mean']:.3f} ± {summary['iou'][c]['std']:.3f}")
     print(f"  prostate HD95 {h['mean']:.1f} ± {h['std']:.1f} mm (n={h['n']})")
     print("  prostate Dice by third: " + ", ".join(f"{k} {v['mean']:.3f}" for k, v in t.items()))
     print(f"  inference {summary['infer_ms']['mean']:.0f} ms/volume | peak VRAM {summary['peak_vram_gb']} GB")
