@@ -546,6 +546,42 @@ ImprovedUNet3D_HipMRI_s4961587/
 
 ## 11. AI Usage Disclosure
 
+## 12. Use of AI tools
+
+I used Claude (Anthropic, Claude Opus, via claude.ai) throughout this project as a
+tutor, code reviewer and writing assistant. Specifically:
+
+**Learning and design**
+- Explanations of the 2D U-Net, 3D U-Net and Improved 3D U-Net, deep supervision,
+  residual blocks, InstanceNorm, Dice + cross-entropy loss, HD95 and medical-image
+  orientation (LPS).
+- Help planning the project (task lists, order of experiments, what to cut if short
+  of time) and discussing design choices (patient-level split, downsampling, loss,
+  metrics, seed study).
+
+**Code**
+- Code was written incrementally. Claude provided skeletons with blanks for me to
+  complete, and explanations of each component. I completed, ran and tested the code on
+  Rangpur.
+- Claude reviewed my scripts before each run and helped debug errors (e.g. a nested
+  percentile in `hd95`, an overwritten model registry in `train.py`, the wrong script in
+  `predict.sh`).
+- Claude wrote parts of the evaluation code: the four-panel FP/FN overlay in
+  `utils.py` and the IoU reporting in `predict.py`.
+
+**Report**
+- Sections 4.3, 6 (tables and wording), 7, 8, 9 and 10 were drafted by Claude from my
+  results, figures and notes. I edited them and checked every number against my
+  `results/*.json` files.
+- Claude edited Section 5, condensed my feasibility review to one page, and produced
+  the architecture diagrams (Appendix A) and `figures/prostate_dice_by_third.png`.
+- Sections 1, 3 and 4.1–4.2 are my own writing; Claude checked them for errors.
+
+**What I did myself:** chose the topic and scope, ran every experiment, made the final
+decisions on models and evaluation, and verified all results. I have reviewed all
+AI-assisted code and text, and I can explain every part of it, including the
+architectures, the training setup, the metrics and the failure analysis.
+
 ## 12. Reference List
 
 https://medschool.ucla.edu/blog-post/what-does-a-radiation-oncologist-do 
