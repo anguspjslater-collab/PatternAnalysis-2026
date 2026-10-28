@@ -8,20 +8,43 @@ October 30th, 2026
 
 ## 1. Problem and User 
 
-Prostate radiotherapy planning requires precise segmentation of the clinical target (prostate) and the surrounding organs at risk (OAR: bladder, rectum, and bone). Once segmented, the selected area then receives a planned radiation dose to kill the unhealthy cells. If the segmentation boundaries leak into surrounding tissue the patient can suffer severe proctitis or cystitis. If the segmentation omits cancerous cells, the patient can experience a relapse or metastasis.
+Prostate radiotherapy planning requires precise segmentation of the clinical target
+(prostate) and the surrounding organs at risk (OAR: bladder, rectum, and bone). Once
+segmented, the selected area then receives a planned radiation dose to kill the unhealthy
+cells. If the segmentation boundaries leak into surrounding tissue the patient can suffer
+severe proctitis or cystitis. If the segmentation omits cancerous cells, the patient can
+experience a relapse or metastasis.
 
-The contouring of the prostate boundaries is conventionally performed by a radiation oncologist, who oversees treatment and ensures safety throughout the therapy (David Geffen School of Medicine at UCLA, n.d.). Building a machine learning (ML) model to segment prostates could help reduce contouring time and variability between clinicians. A model would be used in conjunction with an oncologist to ensure appropriate decisions are made for each case. 
+The contouring of the prostate boundaries is conventionally performed by a radiation
+oncologist, who oversees treatment and ensures safety throughout the therapy (David
+Geffen School of Medicine at UCLA, n.d.). Building a machine learning (ML) model to
+segment prostates could help reduce contouring time and variability between clinicians. A
+model would be used in conjunction with an oncologist to ensure appropriate decisions are
+made for each case.
 
-The engineering problem stems from the composition of HipMRI scans in which the prostate gland can account for ~0.1% of total volume. Further, the base and apex blend into the bladder neck and pelvic floor and the voxels are partial-volume. This makes cross-entropy loss alone insufficient as it is dominated by background, and global Dice limited as it fails to precisely capture boundaries and is instead inflated by the easily predicted central part of the prostate. 
+The engineering problem stems from the composition of HipMRI scans in which the prostate
+gland can account for ~0.1% of total volume. Further, the base and apex blend into the
+bladder neck and pelvic floor and the voxels are partial-volume. This makes cross-entropy
+loss alone insufficient as it is dominated by background, and global Dice limited as it
+fails to precisely capture boundaries and is instead inflated by the easily predicted
+central part of the prostate.
 
-The report details the implementation of a control 2D U-Net segmentation model with no inter-slice context (Ronneberger et al., 2015), a baseline 3D U-Net model based on the paper from Çiçek et al. (2016), and an improved 3D U-Net based on the development by Isensee et al. (2018). To address the problems associated with the task, these models were evaluated on per-class Dice, per-third Dice, 95th-percentile Hausdorff distance (HD95), resource cost (parameters, training time, and VRAM) and a failure autopsy.   
+The report details the implementation of a control 2D U-Net segmentation model with no
+inter-slice context (Ronneberger et al., 2015), a baseline 3D U-Net model based on the
+paper from Çiçek et al. (2016), and an improved 3D U-Net based on the development by
+Isensee et al. (2018). To address the problems associated with the task, these models
+were evaluated on per-class Dice, per-third Dice, 95th-percentile Hausdorff distance
+(HD95), resource cost (parameters, training time, and VRAM) and a failure autopsy.
 
-The goal of the report is to determine if 3D context and the improved 3D U-Net design reduce base / apex errors, or only improve the prediction of the centre of the prostate, and if these improvements are sufficient to warrant the increased computational cost. 
+The goal of the report is to determine if 3D context and the improved 3D U-Net design
+reduce base / apex errors, or only improve the prediction of the centre of the prostate,
+and if these improvements are sufficient to warrant the increased computational cost.
 
 Table 1 summarises the key results. 3D context is worth its cost: it raises test prostate
 Dice by 0.055 and lowers HD95, for ~1.4–1.7× the training time. The Improved 3D U-Net is
-recommended, mainly for its better apex and more consistent HD95, but its overall gain over
-the 3D baseline is small, and every model still needs clinician review at the base and apex.
+recommended, mainly for its better apex and more consistent HD95, but its overall gain
+over the 3D baseline is small, and every model still needs clinician review at the base
+and apex.
 
 Table 1. Key results (test set; validation mean ± std over 3 seeds)
 
@@ -35,13 +58,13 @@ Table 1. Key results (test set; validation mean ± std over 3 seeds)
 
 ### 2.1 User, scope and acceptance criteria
 
-**User.** A radiotherapy planner contouring the prostate and organs at risk on pelvic MRI.
-The prototype drafts 3D contours for review, not sign-off, since boundary errors near the
-rectum or bladder change the dose those organs receive.
+**User.** A radiotherapy planner contouring the prostate and organs at risk on pelvic
+MRI. The prototype drafts 3D contours for review, not sign-off, since boundary errors
+near the rectum or bladder change the dose those organs receive.
 
-**Scope.** HipMRI 3D T2 MRI, 6 labels, downsampled to 128×128×64. Question: does 3D context
-(and the Improved U-Net's design) reduce prostate errors at the base and apex, not just in
-central slices?
+**Scope.** HipMRI 3D T2 MRI, 6 labels, downsampled to 128×128×64. Question: does 3D
+context (and the Improved U-Net's design) reduce prostate errors at the base and apex,
+not just in central slices?
 
 **Acceptance criteria.**
 
@@ -49,31 +72,34 @@ central slices?
 2. Base/apex per-slice prostate Dice no worse than the baseline.
 3. Prostate HD95 (mm) reported and compared with the baseline.
 4. No patient in more than one split.
-5. Peak VRAM ≤ 16 GB (fits a clinic workstation GPU); training ≤ 1 h; inference < 1 s/volume.
+5. Peak VRAM ≤ 16 GB (fits a clinic workstation GPU); training ≤ 1 h;
+   inference < 1 s/volume.
 
 
 
 ### 2.2 Model choice and course concepts
 
-**Data.** 211 volumes / 38 patients, z-scored per volume, 2× downsampled, split by patient
-141/35/35 volumes (24/7/7 patients) so weekly re-scans cannot leak into test.
+**Data.** 211 volumes / 38 patients, z-scored per volume, 2× downsampled, split by
+patient 141/35/35 volumes (24/7/7 patients) so weekly re-scans cannot leak into test.
 
-**Baseline:** 3D U-Net (Çiçek et al., 2016): max-pool down, transposed conv up, concatenated
-skips, 5.6M params. **Proposed (Hard):** Improved 3D U-Net (Isensee et al., 2018): residual
-context modules with dropout, stride-2 conv downsampling, LeakyReLU, deep supervision, 9.5M params.
+**Baseline:** 3D U-Net (Çiçek et al., 2016): max-pool down, transposed conv up,
+concatenated skips, 5.6M params. **Proposed (Hard):** Improved 3D U-Net (Isensee et al.,
+2018): residual context modules with dropout, stride-2 conv downsampling, LeakyReLU, deep
+supervision, 9.5M params.
 
 **Course concepts.** Skip connections restore "where" lost by pooling; 3×3×3 kernels see
-neighbouring slices (the base/apex question); residual connections ease gradient flow (ResNet);
-deep supervision gives deep decoder levels a direct loss signal; soft Dice + CE handles the
-0.1% prostate class.
+neighbouring slices (the base/apex question); residual connections ease gradient flow
+(ResNet); deep supervision gives deep decoder levels a direct loss signal; soft Dice + CE
+handles the 0.1% prostate class.
 
 ### 2.3 Preliminary feasibility evidence
 
-Data audit: 256×256×128 volumes (one 144-slice scan cropped), 1.41–1.88 mm in-plane / 1.56 mm
-slices, LPS orientation for all 211, labels 0–5, prostate 0.10% of voxels. No patient overlap
-(asserted in `dataset.py`).
+Data audit: 256×256×128 volumes (one 144-slice scan cropped), 1.41–1.88 mm in-plane /
+1.56 mm slices, LPS orientation for all 211, labels 0–5, prostate 0.10% of voxels. No
+patient overlap (asserted in `dataset.py`).
 
-Seed-42 results at the time of the feasibility check-off (final 3-seed results in Section 6).
+Seed-42 results at the time of the feasibility check-off (final 3-seed results in Section
+6).
 
 | Model (seed 42)     | Best val prostate Dice | Train time | Peak VRAM |
 | ------------------- | ---------------------- | ---------- | --------- |
@@ -82,35 +108,63 @@ Seed-42 results at the time of the feasibility check-off (final 3-seed results i
 
 
 ![Figure 1: Baseline training curves](figures/unet3d_baseline_v2_curves.png)
-*Figure 1: Baseline. Prostate Dice is 0 until ~epoch 10 (CE dominates); mild overfitting after
-~epoch 60. The Improved model finds the prostate by ~epoch 3 and its val loss does not rise.*
+*Figure 1: Baseline. Prostate Dice is 0 until ~epoch 10 (CE dominates); mild overfitting
+after ~epoch 60. The Improved model finds the prostate by ~epoch 3 and its val loss does
+not rise.*
 
 ### 2.4 Risks, budget and fallback
 
-**Risks.** (1) Global Dice score hides boundary failures: both models already exceed 0.70, so the
-Improved model may not beat the baseline's 0.866 overall yet still differ at the base and apex;
-judge on per-slice Dice (base/mid/apex) and HD95. (2) One seed per model: +0.006 may be noise;
-3 seeds each are running. (3) 2× downsampling blurs the prostate boundary; VRAM headroom
-(2.4 of 40 GB) makes full-resolution crops feasible.
+**Risks.** (1) Global Dice score hides boundary failures: both models already exceed
+0.70, so the Improved model may not beat the baseline's 0.866 overall yet still differ at
+the base and apex; judge on per-slice Dice (base/mid/apex) and HD95. (2) One seed per
+model: +0.006 may be noise; 3 seeds each are running. (3) 2× downsampling blurs the
+prostate boundary; VRAM headroom (2.4 of 40 GB) makes full-resolution crops feasible.
 
-**Budget.** ~15 min per 150-epoch run on one A100; ~15 runs (3 seeds × 2 models plus ablations)
-is about 4 GPU-hours. Queue time, not GPU time, is the constraint.
+**Budget.** ~15 min per 150-epoch run on one A100; ~15 runs (3 seeds × 2 models plus
+ablations) is about 4 GPU-hours. Queue time, not GPU time, is the constraint.
 
 **Next experiment.** Evaluate both models once on the test set: per-class Dice, per-slice
 prostate Dice and HD95, plus 3–5 failure cases.
 
-**Fallback.** The baseline 3D U-Net (Normal tier) is trained and reproducible, so a complete
-submission already exists.
+**Fallback.** The baseline 3D U-Net (Normal tier) is trained and reproducible, so a
+complete submission already exists.
 
 ## 3. Data and Preprocessing
 
-Data were provided by the HipMRI Study (Dowling & Greer, 2021). It comes from the HipMRI study, a prostate radiotherapy study in which patients were scanned with MRI each week during treatment (Dowling et al., 2015). Labels are segmented in 3D by an MR physicist with over 10 years' experience and include background, body, bone, bladder, rectum, and prostate (~0.1% volume) (task sheet Appendix A). It was accessed through the course copy on Rangpur at `/home/groups/comp3710/HipMRI_Study_open/` (`semantic_MRs`, `semantic_labels_only`).
+Data were provided by the HipMRI Study (Dowling & Greer, 2021). It comes from the HipMRI
+study, a prostate radiotherapy study in which patients were scanned with MRI each week
+during treatment (Dowling et al., 2015). Labels are segmented in 3D by an MR physicist
+with over 10 years' experience and include background, body, bone, bladder, rectum, and
+prostate (~0.1% volume) (task sheet Appendix A). It was accessed through the course copy
+on Rangpur at `/home/groups/comp3710/HipMRI_Study_open/` (`semantic_MRs`,
+`semantic_labels_only`).
 
-The task required downsampling of the original image but did not specify a method. As the voxels are nearly cubic (about 1.4-1.9 mm in-plane, 1.56 mm between slices), the images were first downsampled by 2x on every axis (256 x 256 x 128 to 128 x 128 x 64, one image was also cropped at the head (far from prostate) as its initial size was 256 x 256 x 144). This gave 8x fewer voxels and a ~8x decrease in computation per epoch. Downsampling was done in `load_volume()` in the `dataset.py` file by first normalising the image (z-score) then resizing with `torch.nn.functional.interpolate`: trilinear for the image (each voxel is a smooth weighted blend of nearby originals), and nearest for labels (so labels stay as whole class IDs, no decimals). Figure 2 shows an example of a downsampled image against its corresponding original. Downsampling was required by the task, however, it means voxels are of size ~3.1mm (length) and prostate boundaries appear more block-like. 
+The task required downsampling of the original image but did not specify a method. As the
+voxels are nearly cubic (about 1.4-1.9 mm in-plane, 1.56 mm between slices), the images
+were first downsampled by 2x on every axis (256 x 256 x 128 to 128 x 128 x 64, one image
+was also cropped at the head (far from prostate) as its initial size was 256 x 256 x
+144). This gave 8x fewer voxels and a ~8x decrease in computation per epoch. Downsampling
+was done in `load_volume()` in the `dataset.py` file by first normalising the image
+(z-score) then resizing with `torch.nn.functional.interpolate`: trilinear for the image
+(each voxel is a smooth weighted blend of nearby originals), and nearest for labels (so
+labels stay as whole class IDs, no decimals). Figure 2 shows an example of a downsampled
+image against its corresponding original. Downsampling was required by the task, however,
+it means voxels are of size ~3.1mm (length) and prostate boundaries appear more
+block-like.
 
 ![Figure 2: Downsampled example](figures/downsample_check.png)
 
-In all there were 211 scans across 38 patients, with a median of 8 scans per patient (min 1, max 8). 22 patients have the full 8 weekly scans. The data was split into train, validation, and test sets by patient (shuffled, fixed seed ~70 / 15 / 15 split). As week-to-week scans for a given patient are near identical, splitting by volume would risk the model being able to identify and learn specific patients, possibly leading to overstated success in testing (if a patient's scans happened to be present in both the train and test sets). No patient appears in more than one split (asserted in code). Validation selected the best checkpoint; the test set is evaluated once. Table 2 quantifies the split. The pre-made train/validation/test split discussed on Ed applies only to the 2D `keras_slices_data`; the 3D volumes used here are not pre-split, so the patient-level split was made in `dataset.py`.
+In all there were 211 scans across 38 patients, with a median of 8 scans per patient (min
+1, max 8). 22 patients have the full 8 weekly scans. The data was split into train,
+validation, and test sets by patient (shuffled, fixed seed ~70 / 15 / 15 split). As
+week-to-week scans for a given patient are near identical, splitting by volume would risk
+the model being able to identify and learn specific patients, possibly leading to
+overstated success in testing (if a patient's scans happened to be present in both the
+train and test sets). No patient appears in more than one split (asserted in code).
+Validation selected the best checkpoint; the test set is evaluated once. Table 2
+quantifies the split. The pre-made train/validation/test split discussed on Ed applies
+only to the 2D `keras_slices_data`; the 3D volumes used here are not pre-split, so the
+patient-level split was made in `dataset.py`.
 
 Table 2. Train, validation, and test split composition
 
@@ -123,45 +177,67 @@ Table 2. Train, validation, and test split composition
 
 ## 4. Models
 
-A 2D control U-Net (Ronneberger et al., 2015), base 3D U-Net (Çiçek et al., 2016) and an improved 3D U-Net (Isensee et al., 2018) were all trained on the HipMRI data. They share the encoder-decoder (U) shape: 4 down-sampling levels, channels 16 -> 32 -> 64 -> 128 -> 256, skip connections concatenated on channels, and a 1x1(x1) output convolution. They also share InstanceNorm (batch size 2 makes BatchNorm's batch statistics unreliable), and the identical loss and training setup, so architecture is the only variable. 
+A 2D control U-Net (Ronneberger et al., 2015), base 3D U-Net (Çiçek et al., 2016) and an
+improved 3D U-Net (Isensee et al., 2018) were all trained on the HipMRI data. They share
+the encoder-decoder (U) shape: 4 down-sampling levels, channels 16 -> 32 -> 64 -> 128 ->
+256, skip connections concatenated on channels, and a 1x1(x1) output convolution. They
+also share InstanceNorm (batch size 2 makes BatchNorm's batch statistics unreliable), and
+the identical loss and training setup, so architecture is the only variable.
 
 See Appendix A for an AI-generated model architecture diagram for all three models. 
 
 ### 4.1 Control 2D U-Net
 
-The 2D U-Net serves as a control. It has no inter-slice context, so comparing it with the 3D models isolates the value of the 3D context. The volume is split into 64 axial slices, each segmented independently (meaning no continuity across axial slices), prediction restacked into (B, 6, 128, 128, 64). 
+The 2D U-Net serves as a control. It has no inter-slice context, so comparing it with the
+3D models isolates the value of the 3D context. The volume is split into 64 axial slices,
+each segmented independently (meaning no continuity across axial slices), prediction
+restacked into (B, 6, 128, 128, 64).
 
-The 4 downsampling layers and bottleneck of the 2D U-Net have a double convolution structure, where this process is repeated twice per layer:
+The 4 downsampling layers and bottleneck of the 2D U-Net have a double convolution
+structure, where this process is repeated twice per layer:
 
 1. 3x3 convolution (stride 1)
 2. InstanceNorm 
 3. ReLU 
 
-Between encoder layers, a 2x2 max-pool halves the height and width (slices never pooled together).
+Between encoder layers, a 2x2 max-pool halves the height and width (slices never pooled
+together).
 
-This takes the number of channels from 1 to 256 at the bottleneck, where the data has the shape (B x 64, 256, 8, 8). From here it is passed to the decoder, which involves four decoder levels, each: 
+This takes the number of channels from 1 to 256 at the bottleneck, where the data has the
+shape (B x 64, 256, 8, 8). From here it is passed to the decoder, which involves four
+decoder levels, each:
 
 1. 2x2 Transposed convolution (halves the channels, doubles height and width) 
 2. Concatenate with the matching encoder level's output (skip connections)
 3. Double convolution (3 steps from above, twice)
 
-After this the data undergoes a final 1x1 convolution and restack into a volume to get a 6 channel output (one for every label). The model has 1,942,374 parameters, fewer than the 3D models due to the 9 vs 27 kernel weights. 
+After this the data undergoes a final 1x1 convolution and restack into a volume to get a
+6 channel output (one for every label). The model has 1,942,374 parameters, fewer than
+the 3D models due to the 9 vs 27 kernel weights.
 
-The 2D model uses the same widths, loss, data, and steps as the 3D models. The loss is computed on the restacked volume. 
+The 2D model uses the same widths, loss, data, and steps as the 3D models. The loss is
+computed on the restacked volume.
 
 ### 4.2 Baseline 3D U-Net
 
 Same as 4.1 except: 
-- The standard 3D baseline from Çiçek et al. (2016), the established reference for volumetric segmentation that the Improved model is compared against.
+- The standard 3D baseline from Çiçek et al. (2016), the established reference for
+  volumetric segmentation that the Improved model is compared against.
 - Processes the whole volume at once: (B, 1, 128, 128, 64) giving inter-slice context.
-- Encoder has 3x3x3 convolutions with the same double convolution structure as the 2D model.
-- a 2x2x2 max-pool between encoder levels halves all three axes, so the bottleneck is (B, 256, 8, 8, 4). 
-- Decoder has the same 4 levels with 2x2x2 transposed convolutions, concatenated skips, then the double convolution.
-- Output is a 1x1x1 convolution to 6 channels: (B, 6, 128, 128, 64), there is no restacking since it is already a volume.
+- Encoder has 3x3x3 convolutions with the same double convolution structure as the 2D
+  model.
+- a 2x2x2 max-pool between encoder levels halves all three axes, so the bottleneck is (B,
+  256, 8, 8, 4).
+- Decoder has the same 4 levels with 2x2x2 transposed convolutions, concatenated skips,
+  then the double convolution.
+- Output is a 1x1x1 convolution to 6 channels: (B, 6, 128, 128, 64), there is no
+  restacking since it is already a volume.
 - Parameters: 5,646,470 (more than 2D because each 3×3×3 kernel has 27 weights vs 9).
-- Unlike the model from Çiçek et al. the model uses InstanceNorm instead of BatchNorm, widths starting at 16 instead of 32, and 4 pooling levels instead of 3. 
+- Unlike the model from Çiçek et al. the model uses InstanceNorm instead of BatchNorm,
+  widths starting at 16 instead of 32, and 4 pooling levels instead of 3.
 
-Because the 3x3x3 kernels and the 2x2x2 pooling span the slice axis, the model can use information from neighbouring slices, which is the property the 2D control lacks. 
+Because the 3x3x3 kernels and the 2x2x2 pooling span the slice axis, the model can use
+information from neighbouring slices, which is the property the 2D control lacks.
 
 ### 4.3 Improved 3D U-Net
 
@@ -171,23 +247,23 @@ The proposed model, following Isensee et al. (2018). It keeps the overall layout
 
 - **Stem:** a single 3x3x3 convolution lifts the input from 1 to 16 channels before any
   residual block, because a residual addition needs input and output of the same shape.
-- **Context modules (encoder):** each level is a residual block,
-  x + [InstanceNorm → LeakyReLU → 3x3x3 conv → Dropout3d(0.3) → InstanceNorm → LeakyReLU → 3x3x3 conv](x).
-  The identity path lets gradients bypass the convolutions (He et al., 2016), so each block
-  only learns a correction to its input. Dropout3d zeroes ~30% of feature maps at random
-  during training to reduce overfitting.
+- **Context modules (encoder):** each level is a residual block, x + [InstanceNorm →
+  LeakyReLU → 3x3x3 conv → Dropout3d(0.3) → InstanceNorm → LeakyReLU → 3x3x3 conv](x).
+  The identity path lets gradients bypass the convolutions (He et al., 2016), so each
+  block only learns a correction to its input. Dropout3d zeroes ~30% of feature maps at
+  random during training to reduce overfitting.
 - **Stride-2 3x3x3 convolutions** replace max-pooling between levels, so downsampling is
   learned rather than a fixed rule.
 - **Decoder:** each level upsamples with trilinear interpolation (x2) followed by a 3x3x3
   convolution that halves the channels, instead of a transposed convolution (avoiding
   checkerboard artefacts). The skip connection is then concatenated and merged by a
-  **localisation module**: a 3x3x3 convolution followed by a 1x1x1 convolution that halves
-  the channels cheaply.
-- **Deep supervision:** 1x1x1 segmentation heads produce 6-class maps at three decoder levels
-  (1/4, 1/2 and full size). Each coarse map is upsampled and added to the next finer one,
-  and the sum is the output. This gives the deeper decoder levels a short, direct path from
-  the loss. It differs from a skip connection, which carries encoder *features* across the
-  U; deep supervision sends decoder *predictions* to the output.
+  **localisation module**: a 3x3x3 convolution followed by a 1x1x1 convolution that
+  halves the channels cheaply.
+- **Deep supervision:** 1x1x1 segmentation heads produce 6-class maps at three decoder
+  levels (1/4, 1/2 and full size). Each coarse map is upsampled and added to the next
+  finer one, and the sum is the output. This gives the deeper decoder levels a short,
+  direct path from the loss. It differs from a skip connection, which carries encoder
+  *features* across the U; deep supervision sends decoder *predictions* to the output.
 - **LeakyReLU** (slope 0.01) replaces ReLU throughout, so negative inputs keep a small
   gradient and units cannot "die".
 
@@ -210,18 +286,19 @@ is the only variable.
 | Hardware | One NVIDIA A100 (Rangpur) |
 
 CE gives smooth, stable gradients from the first epoch, but on its own it is dominated by
-the background; the soft Dice term (Milletari et al., 2016) weights each class equally, so
-the ~0.1% prostate class counts as much as the background. Together they give stable early
-training and class balance. Adam (Kingma & Ba, 2015) uses momentum and a per-weight adaptive
-step size, which makes it the standard choice for U-Nets and robust without tuning. Cosine
-annealing (Loshchilov & Hutter, 2017) reduces the step size over training so the weights
-settle into a minimum. InstanceNorm (Ulyanov et al., 2016) normalises each scan separately,
-which is stable at a batch size of 2. The epoch with the best validation prostate Dice
-(between 20 and 97 across runs) was kept as the final checkpoint; the test set was never
-used for selection. bf16 autocast roughly halves activation memory and speeds up training
-on the A100, while the loss is computed in fp32 for numerical precision. For the 2D model
-the loss is computed on the restacked volume, so all three models receive an identical
-training signal. All models were implemented in PyTorch (Paszke et al., 2019).
+the background; the soft Dice term (Milletari et al., 2016) weights each class equally,
+so the ~0.1% prostate class counts as much as the background. Together they give stable
+early training and class balance. Adam (Kingma & Ba, 2015) uses momentum and a per-weight
+adaptive step size, which makes it the standard choice for U-Nets and robust without
+tuning. Cosine annealing (Loshchilov & Hutter, 2017) reduces the step size over training
+so the weights settle into a minimum. InstanceNorm (Ulyanov et al., 2016) normalises each
+scan separately, which is stable at a batch size of 2. The epoch with the best validation
+prostate Dice (between 20 and 97 across runs) was kept as the final checkpoint; the test
+set was never used for selection. bf16 autocast roughly halves activation memory and
+speeds up training on the A100, while the loss is computed in fp32 for numerical
+precision. For the 2D model the loss is computed on the restacked volume, so all three
+models receive an identical training signal. All models were implemented in PyTorch
+(Paszke et al., 2019).
 
 ## 6. Results
 
@@ -234,9 +311,9 @@ training signal. All models were implemented in PyTorch (Paszke et al., 2019).
 | Improved 3D U-Net | 0.870 ± 0.001 | 81, 83, 97 | 16.9 min | 2.36 GB | 9.5M |
 
 Moving from 2D to 3D adds +0.032 validation prostate Dice (~10x the seed-to-seed spread);
-the Improved model adds only +0.002 over the 3D baseline, within seed noise. The best epoch
-rises with model complexity: the 2D model peaks earliest and then overfits, while dropout and
-deep supervision let the Improved model keep improving until epochs 81–97.
+the Improved model adds only +0.002 over the 3D baseline, within seed noise. The best
+epoch rises with model complexity: the 2D model peaks earliest and then overfits, while
+dropout and deep supervision let the Improved model keep improving until epochs 81–97.
 
 ### 6.2 Test set (35 volumes, 7 patients; evaluated once)
 
@@ -250,8 +327,9 @@ deep supervision let the Improved model keep improving until epochs 81–97.
 | Prostate HD95 (mm) | 6.8 ± 3.0 | 5.3 ± 2.3 | 4.7 ± 1.3 |
 
 All three models meet the ≥ 0.70 prostate Dice target. 3D context improves every class,
-most for the small, low-contrast structures (prostate +0.055, rectum +0.033), and reduces both
-the mean and the spread of prostate HD95. IoU is computed per volume as Dice / (2 − Dice).
+most for the small, low-contrast structures (prostate +0.055, rectum +0.033), and reduces
+both the mean and the spread of prostate HD95. IoU is computed per volume as Dice / (2 −
+Dice).
 
 ### 6.3 Base and apex: the boundary dilemma
 
@@ -263,12 +341,12 @@ the mean and the spread of prostate HD95. IoU is computed per volume as Dice / (
 
 ![Prostate Dice by third](figures/prostate_dice_by_third.png)
 
-The 2D and 3D U-Nets are ~0.08–0.09 Dice worse at both the apex and the base than in the middle 
-of the gland, which the global Dice score hides. The Improved model narrows the apex gap to 
-~0.06, but its base gap remains ~0.09. 3D context raises all three thirds by a similar amount
-(~+0.04), so it improves the model overall but does not by itself close the gap at the ends.
-The Improved model's only clear gain over the 3D baseline is at the apex (+0.034); its base
-is no better.
+The 2D and 3D U-Nets are ~0.08–0.09 Dice worse at both the apex and the base than in the
+middle of the gland, which the global Dice score hides. The Improved model narrows the
+apex gap to ~0.06, but its base gap remains ~0.09. 3D context raises all three thirds by
+a similar amount (~+0.04), so it improves the model overall but does not by itself close
+the gap at the ends. The Improved model's only clear gain over the 3D baseline is at the
+apex (+0.034); its base is no better.
 
 ### 6.4 Resources
 
@@ -278,18 +356,18 @@ is no better.
 | 3D U-Net | 5.6M | 13.6 min | 1.38 GB | 23 ms | 0.32 GB |
 | Improved 3D U-Net | 9.5M | 16.9 min | 2.36 GB | 27 ms | 0.48 GB |
 
-At this downsampled resolution, 3D costs ~1.4–1.7x the 2D training time and far less than the
-"5–10x" the task anticipated; the 3D baseline even uses less training memory than the 2D model,
-because the 2D network keeps all 64 slices at every level while 3D pooling also halves the slice
-axis. All models infer in under 30 ms per volume on one A100.
+At this downsampled resolution, 3D costs ~1.4–1.7x the 2D training time and far less than
+the "5–10x" the task anticipated; the 3D baseline even uses less training memory than the
+2D model, because the 2D network keeps all 64 slices at every level while 3D pooling also
+halves the slice axis. All models infer in under 30 ms per volume on one A100.
 
 ## 7. Failure autopsy
 
-Five test volumes were examined: the four with the lowest prostate Dice, plus the
-best case (V027_Week7) for contrast. Each figure shows an axial and a sagittal slice
-through the prostate: input | ground truth (green) | prediction (yellow) |
-error map (red = false positive, blue = false negative). In the sagittal view, anterior is left
-and superior (base, towards the bladder) is up. Figures for all three models are in
+Five test volumes were examined: the four with the lowest prostate Dice, plus the best
+case (V027_Week7) for contrast. Each figure shows an axial and a sagittal slice through
+the prostate: input | ground truth (green) | prediction (yellow) | error map (red = false
+positive, blue = false negative). In the sagittal view, anterior is left and superior
+(base, towards the bladder) is up. Figures for all three models are in
 `figures/overlay_<model>_<case>.png`; the Improved model's figures are shown below.
 
 | Case | 2D Dice / HD95 | 3D Dice / HD95 | Improved Dice / HD95 | Failure mode |
@@ -344,9 +422,9 @@ model is best on both scans and cuts HD95 to 4.6 mm at Week 7.
 
 ![V027](figures/overlay_improved_v1_V027_Week7.png)
 
-This is a large, well-defined gland with a full bladder above it, so the base boundary has
-strong contrast. All models score ≥ 0.876, and the only errors are a scattered rim one
-voxel wide. The HD95 of 3.1–3.4 mm is about a single downsampled voxel, which is the
+This is a large, well-defined gland with a full bladder above it, so the base boundary
+has strong contrast. All models score ≥ 0.876, and the only errors are a scattered rim
+one voxel wide. The HD95 of 3.1–3.4 mm is about a single downsampled voxel, which is the
 practical floor at this resolution.
 
 ### 7.5 Patterns
@@ -392,8 +470,8 @@ Moving from 2D to 3D is the one change that clearly pays off. It adds +0.055 pro
 Dice on test (0.787 → 0.842) and +0.032 on validation, about 10× the seed-to-seed spread.
 It removes the 2D model's disconnected false positives (Section 7.1) and lowers HD95 from
 6.8 to 5.3 mm. The task anticipated a 5–10× cost for 3D. At this resolution the real cost
-is about 1.4–1.7× the training time, under 2.5 GB of GPU memory, and under 30 ms per volume
-at inference. The cost concern does not hold here.
+is about 1.4–1.7× the training time, under 2.5 GB of GPU memory, and under 30 ms per
+volume at inference. The cost concern does not hold here.
 
 ### 8.2 Why the Improved model, and how sure we are
 
@@ -406,11 +484,11 @@ On validation, the Improved model and the 3D baseline are statistically tied
   for a clinician to catch;
 - **higher Dice on all five classes**.
 
-The price is small: 9.5M vs 5.6M parameters, 17 vs 14 minutes of training, and 27 vs 23 ms per
-volume. It is not a clear win everywhere: its base is no better (0.805 vs 0.813), and it
-does worse on the large, low-contrast gland in K018_Week7. The test results come from 7
-patients and a single training seed. If a simpler model is preferred, the 3D baseline is an
-acceptable alternative.
+The price is small: 9.5M vs 5.6M parameters, 17 vs 14 minutes of training, and 27 vs 23
+ms per volume. It is not a clear win everywhere: its base is no better (0.805 vs 0.813),
+and it does worse on the large, low-contrast gland in K018_Week7. The test results come
+from 7 patients and a single training seed. If a simpler model is preferred, the 3D
+baseline is an acceptable alternative.
 
 ### 8.3 What still needs a human
 
@@ -430,9 +508,9 @@ These rules are proposed here, not tested.
 
 - **Validate on more patients.** The 7 test patients come from one dataset, and the
   results have wide error bars.
-- **Train at full resolution** on a crop around the prostate. At ~3 mm voxels, a one-voxel
-  error is already about the HD95 of the best case, so boundary precision is limited by
-  the resolution, not the model.
+- **Train at full resolution** on a crop around the prostate. At ~3 mm voxels, a
+  one-voxel error is already about the HD95 of the best case, so boundary precision is
+  limited by the resolution, not the model.
 - **Report HD95 in mm alongside Dice,** and track base and apex separately. A good global
   Dice can hide poor ends.
 
@@ -457,8 +535,8 @@ These rules are proposed here, not tested.
 **Preprocessing**
 
 - **2× downsampling** to 128×128×64 (~3.1 mm voxels) was needed to fit 3D training in
-  memory with a reasonable batch size. It limits boundary precision: a one-voxel error is ~3 mm,
-  so the best achievable HD95 is about one voxel.
+  memory with a reasonable batch size. It limits boundary precision: a one-voxel error is
+  ~3 mm, so the best achievable HD95 is about one voxel.
 - **HD95 is quantised.** Because HD95 is measured on the downsampled grid, it takes
   roughly voxel-sized steps (3.1, 6.2 mm …). It is also measured against the
   downsampled labels, not the original full-resolution contours.
@@ -470,15 +548,16 @@ These rules are proposed here, not tested.
 
 **Training**
 
-- **Shared hyperparameters.** All three models use the same loss, optimiser, learning rate,
-  schedule and batch size (2 volumes). This keeps the comparison fair, but none of the models
-  was tuned individually. In particular, for the 2D model a batch of 2 volumes is 128 slices,
-  and a different batch size or learning rate might narrow its gap.
+- **Shared hyperparameters.** All three models use the same loss, optimiser, learning
+  rate, schedule and batch size (2 volumes). This keeps the comparison fair, but none of
+  the models was tuned individually. In particular, for the 2D model a batch of 2 volumes
+  is 128 slices, and a different batch size or learning rate might narrow its gap.
 - **Augmentation** was limited to random left–right flips. Stronger
   augmentation (intensity, elastic, small rotations) might help the low-contrast and
   unusual-size cases in Section 7.
-- **Checkpoint selection on validation prostate Dice** favours the prostate over the other
-  classes. A different selection metric could change the other per-class results slightly.
+- **Checkpoint selection on validation prostate Dice** favours the prostate over the
+  other classes. A different selection metric could change the other per-class results
+  slightly.
 
 ## 10. Reproducing the results
 
@@ -530,9 +609,12 @@ sbatch train.sh --model improved --seed 1 --tag s1
 sbatch train.sh --model improved --seed 2 --tag s2
 
 # Test set, evaluated once per model, with overlays for the autopsy cases
-sbatch predict.sh --model improved --tag v1 --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
-sbatch predict.sh --model unet3d   --tag baseline_v2 --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
-sbatch predict.sh --model unet2d   --tag v1 --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
+sbatch predict.sh --model improved --tag v1 \
+  --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
+sbatch predict.sh --model unet3d   --tag baseline_v2 \
+  --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
+sbatch predict.sh --model unet2d   --tag v1 \
+  --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
 ```
 
 Each training run writes `checkpoints/<run>.pt` (not committed), `results/<run>.json`
@@ -603,11 +685,12 @@ architectures, the training setup, the metrics and the failure analysis.
 
 ### Data acknowledgement
 
-This project uses the HipMRI Study dataset (labelled weekly MR images of the male
-pelvis), provided by CSIRO and Calvary Mater Newcastle (Dowling & Greer, 2021) and
-accessed through UQ's Rangpur cluster under its data use agreement. The data was used
-only for non-commercial research and education. No attempt was made to re-identify any
-patient, and no images or labels are included in this repository.
+Data were provided by the HipMRI Study (Dowling & Greer, 2021; CSIRO and Calvary Mater
+Newcastle), accessed through the COMP3710 course copy on UQ's Rangpur cluster. The HipMRI
+Study is described in Dowling et al. (2015). In line with the HipMRI Study data use terms,
+the data were used only for non-commercial research and education, no attempt was made to
+identify or contact any participant, and no images or labels are included in this
+repository.
 
 ### References
 
@@ -666,8 +749,8 @@ ingredient for fast stylization. *arXiv preprint*. https://arxiv.org/abs/1607.08
 
 ## Appendix A. Architecture diagrams
 
-Shapes are (channels · spatial size) for one scan; the batch dimension is omitted. Diagrams
-were generated with AI assistance from the model code in `modules.py`.
+Shapes are (channels · spatial size) for one scan; the batch dimension is omitted.
+Diagrams were generated with AI assistance from the model code in `modules.py`.
 
 ![Figure A1: 2D U-Net](figures/appendixA_unet2d.png)
 *Figure A1: Control 2D U-Net (1.9M parameters). Each of the 64 axial slices is
