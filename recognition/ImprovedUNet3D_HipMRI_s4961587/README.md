@@ -359,7 +359,107 @@ reviewed manually (see Section 8).
 
 ## 8. Recommendation and Trade-Offs
 
+## 8. Recommendation
+
+**Use a 3D model. Of the two, prefer the Improved 3D U-Net.** It should be used to
+draft prostate contours that a clinician then edits, not to produce final contours on
+its own.
+
+### 8.1 Why 3D
+
+Moving from 2D to 3D is the one change that clearly pays off. It adds +0.055 prostate
+Dice on test (0.787 → 0.842) and +0.032 on validation, about 10× the seed-to-seed spread.
+It removes the 2D model's disconnected false positives (Section 7.1) and lowers HD95 from
+6.8 to 5.3 mm. The task anticipated a 5–10× cost for 3D. At this resolution the real cost
+is about 1.4–1.7× the training time, under 2.5 GB of GPU memory, and under 30 ms per volume
+at inference. The cost concern does not hold here.
+
+### 8.2 Why the Improved model, and how sure we are
+
+On validation, the Improved model and the 3D baseline are statistically tied
+(0.870 ± 0.001 vs 0.868 ± 0.002). On test it is slightly better overall (0.849 vs
+0.842), but its real advantages are:
+
+- **the apex**, the hardest region (0.839 vs 0.805 Dice);
+- **consistency**: prostate HD95 4.7 ± 1.3 mm vs 5.3 ± 2.3 mm, so fewer bad outliers
+  for a clinician to catch;
+- **higher Dice on all five classes**.
+
+The price is small: 9.5M vs 5.6M parameters, 17 vs 14 minutes of training, and 27 vs 23 ms per
+volume. It is not a clear win everywhere: its base is no better (0.805 vs 0.813), and it
+does worse on the large, low-contrast gland in K018_Week7. The test results come from 7
+patients and a single training seed. If a simpler model is preferred, the 3D baseline is an
+acceptable alternative.
+
+### 8.3 What still needs a human
+
+| Situation | Why | Action |
+| --- | --- | --- |
+| **Apex and base slices (every case)** | ~0.06–0.09 Dice lower than mid-gland in all models (Section 6.3) | Always review and edit the top and bottom of the contour |
+| **Bladder-neck boundary** | Models extend the prostate into the bladder neck (T014, K008) | Check the superior edge, especially next to a bright bladder |
+| **Small glands** | A one-voxel (~3 mm) error is a large share of the volume (T014) | Review in full |
+| **Large or low-contrast glands** | Systematic under-segmentation (K018) | Review in full; expect the contour to be too small |
+| **Disconnected prostate islands** | Not seen in 3D, but a clear sign of failure (2D, K008) | Reject the draft and re-contour |
+
+A simple automatic check could flag the last three situations before review: predicted
+prostate volume far outside the training range, or more than one connected component.
+These rules are proposed here, not tested.
+
+### 8.4 Before clinical use
+
+- **Validate on more patients.** The 7 test patients come from one dataset, and the
+  results have wide error bars.
+- **Train at full resolution** on a crop around the prostate. At ~3 mm voxels, a one-voxel
+  error is already about the HD95 of the best case, so boundary precision is limited by
+  the resolution, not the model.
+- **Report HD95 in mm alongside Dice,** and track base and apex separately. A good global
+  Dice can hide poor ends.
+
 ## 9. Limitations and Future Work
+
+## 9. Limitations
+
+**Data and evaluation**
+
+- **Small test set.** The test set has 35 volumes but only 7 patients. Scans of the same
+  patient from different weeks are highly correlated (T014 provides two of the five worst
+  cases), so the effective sample size is closer to 7 than 35. Differences of ~0.01 Dice
+  between models on test should not be over-interpreted.
+- **One split, one test seed.** All results use a single patient-level split
+  (`split_seed=42`). Seeds were repeated (×3) only on validation; each model was
+  evaluated on test once, from its seed-42 checkpoint. A different split, or
+  cross-validation, could reorder the two 3D models.
+- **One dataset, one site.** All scans come from a single study. Performance on other
+  scanners, protocols or patient populations is untested.
+- **Ground-truth uncertainty.** The apex and base are also where manual contours differ
+  most between clinicians. Some of the error measured there may be label noise rather
+  than model error, but this could not be measured with a single set of labels.
+
+**Preprocessing**
+
+- **2× downsampling** to 128×128×64 (~3.1 mm voxels) was needed to fit 3D training in
+  memory with a reasonable batch size. It limits boundary precision: a one-voxel error is ~3 mm,
+  so the best achievable HD95 is about one voxel.
+- **HD95 is quantised.** Because HD95 is measured on the downsampled grid, it takes
+  roughly voxel-sized steps (3.1, 6.2 mm …). It is also measured against the
+  downsampled labels, not the original full-resolution contours.
+- **No resampling to a common voxel spacing.** Volumes were resized by a fixed factor
+  rather than resampled to a fixed spacing (in mm), so physical scale varies slightly
+  between scans.
+- **Depth crop to 128 slices.** This keeps the pelvis, but the crop is fixed rather
+  than centred on the prostate.
+
+**Training**
+
+- **Shared hyperparameters.** All three models use the same loss, optimiser, learning rate,
+  schedule and batch size (2 volumes). This keeps the comparison fair, but none of the models
+  was tuned individually. In particular, for the 2D model a batch of 2 volumes is 128 slices,
+  and a different batch size or learning rate might narrow its gap.
+- **Augmentation** [was limited to random left–right flips / was not used]. Stronger
+  augmentation (intensity, elastic, small rotations) might help the low-contrast and
+  unusual-size cases in Section 7.
+- **Checkpoint selection on validation prostate Dice** favours the prostate over the other
+  classes. A different selection metric could change the other per-class results slightly.
 
 ## 10. Reproducing this Work
 
