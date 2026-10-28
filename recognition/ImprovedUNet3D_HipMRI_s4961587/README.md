@@ -247,11 +247,9 @@ The proposed model, following Isensee et al. (2018). It keeps the overall layout
 
 - **Stem:** a single 3x3x3 convolution lifts the input from 1 to 16 channels before any
   residual block, because a residual addition needs input and output of the same shape.
-- **Context modules (encoder):** each level is a residual block, x + [InstanceNorm →
-  LeakyReLU → 3x3x3 conv → Dropout3d(0.3) → InstanceNorm → LeakyReLU → 3x3x3 conv](x).
-  The identity path lets gradients bypass the convolutions (He et al., 2016), so each
-  block only learns a correction to its input. Dropout3d zeroes ~30% of feature maps at
-  random during training to reduce overfitting.
+- **Context modules (encoder):** each level is a residual block, `x + block(x)`, where
+  block = InstanceNorm → LeakyReLU → 3x3x3 conv → Dropout3d(0.3) → InstanceNorm →
+  LeakyReLU → 3x3x3 conv.
 - **Stride-2 3x3x3 convolutions** replace max-pooling between levels, so downsampling is
   learned rather than a fixed rule.
 - **Decoder:** each level upsamples with trilinear interpolation (x2) followed by a 3x3x3
