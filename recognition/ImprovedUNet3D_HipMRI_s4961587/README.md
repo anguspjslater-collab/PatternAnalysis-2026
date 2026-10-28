@@ -463,6 +463,87 @@ These rules are proposed here, not tested.
 
 ## 10. Reproducing this Work
 
+## 10. Reproducing the results
+
+### 10.1 Environment
+
+All runs used one NVIDIA A100 on UQ's Rangpur cluster (partition `comp3710`).
+
+| Package | Version |
+| --- | --- |
+| Python | 3.x |
+| PyTorch | 2.13.0 (CUDA 13.0) |
+| NumPy | 2.4.6 |
+| nibabel | 5.4.2 |
+| matplotlib | 3.11.1 |
+| SciPy | 1.17.1 |
+
+```bash
+conda create -n torch python=3.x
+conda activate torch
+pip install torch numpy nibabel matplotlib scipy
+```
+
+### 10.2 Data
+
+The HipMRI Study data is read in place from
+`/home/groups/comp3710/HipMRI_Study_open/` (`semantic_MRs/` and
+`semantic_labels_only/`). Nothing is copied into the repository. To use another location,
+pass `--data_dir` to `train.py` or `predict.py`. The patient-level split is generated in
+`dataset.py` from `--split_seed 42`, so it is identical on every run. The data loader
+from the task's Appendix B was not used; `dataset.py` applies the same steps (depth crop,
+z-score, linear interpolation for images, nearest-neighbour for labels), plus the
+patient-level split.
+
+### 10.3 Commands
+
+From `recognition/ImprovedUNet3D_HipMRI_s4961587/` on Rangpur:
+
+```bash
+# Smoke test (~2 min): checks the pipeline runs end to end
+sbatch --time=00:20:00 train.sh --model improved --epochs 3 --limit 4 --tag smoke
+
+# Main runs (150 epochs, seed 42)
+sbatch train.sh --model unet2d   --tag v1
+sbatch train.sh --model unet3d   --tag baseline_v2
+sbatch train.sh --model improved --tag v1
+
+# Seed study (validation only): repeat each with seeds 1 and 2
+sbatch train.sh --model improved --seed 1 --tag s1
+sbatch train.sh --model improved --seed 2 --tag s2
+
+# Test set, evaluated once per model, with overlays for the autopsy cases
+sbatch predict.sh --model improved --tag v1 --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
+sbatch predict.sh --model unet3d   --tag baseline_v2 --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
+sbatch predict.sh --model unet2d   --tag v1 --cases K008_Week0 K018_Week7 T014_Week2 T014_Week7 V027_Week7
+```
+
+Each training run writes `checkpoints/<run>.pt` (not committed), `results/<run>.json`
+(per-epoch history, best validation Dice, time, VRAM) and `figures/<run>_curves.png`.
+Each `predict.py` run writes `results/test_<run>.json` (per-case Dice, IoU, HD95,
+per-third Dice and timing) and `figures/overlay_<run>_<case>.png`.
+
+Results should match the tables in Section 6 to within about ±0.005 Dice; cuDNN
+convolutions are not fully deterministic.
+
+### 10.4 Files
+
+```
+ImprovedUNet3D_HipMRI_s4961587/
+├── dataset.py          # loading, preprocessing, patient-level split, DataLoaders
+├── modules.py          # UNet2D, UNet3D, ImprovedUNet3D, DiceCELoss
+├── train.py            # training loop, validation, checkpointing, curves
+├── predict.py          # one-time test evaluation, metrics, overlays
+├── utils.py            # Dice, HD95, per-third Dice, plotting
+├── train.sh            # Slurm script for train.py
+├── predict.sh          # Slurm script for predict.py
+├── inspect_data.ipynb  # data exploration and orientation checks
+├── feasibility.md      # one-page feasibility review
+├── figures/            # curves, overlays, per-third chart
+├── results/            # JSON logs for every run
+└── checkpoints/        # model weights (git-ignored)
+```
+
 ## 11. AI Usage Disclosure
 
 ## 12. Reference List
