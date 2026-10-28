@@ -1,26 +1,32 @@
 """
-utils.py - evaluation metric and plotting helpers shared by train.py and predict.py.
+utils.py: metrics and plotting helpers for HipMRI prostate segmentation.
 
-Author: Angus Slater (s4961587)
-Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
-Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+Author: Angus Slater (49615878), COMP3710 2026
 
-Contents:
-- CLASS_NAMES: label index -> structure name (0 background ... 5 prostate).
-- dice_per_class: hard (argmax) Dice per class, the reported metric. Kept
-  separate from the soft Dice in the training loss: soft Dice uses
-  probabilities so it can be differentiated; hard Dice scores the actual
-  predicted mask, which is what a clinician would see.
-- plot_history: training curves (loss split into CE and Dice parts, plus
-  per-class validation Dice), saved to PNG every epoch.
-- binary_dice: Dice of two boolean masks (NaN if both are empty).
-- hd95: 95th-percentile Hausdorff distance between mask surfaces, in mm.
-- dice_by_third: prostate Dice in the apex / mid / base thirds of its slices.
-- plot_overlay: axial + sagittal slices with truth (green) and prediction (red).
+Contents
+--------
+CLASS_NAMES      Names of the 6 label classes (background, body, bone, bladder,
+                 rectum, prostate), indexed by label value.
+dice_per_class   Hard Dice per class from argmax predictions; used for validation
+                 every epoch and for the test summary.
+plot_history     Training curves: CE, soft-Dice and total loss (train solid, val
+                 dashed) plus validation prostate Dice per epoch.
+binary_dice      Dice between two boolean masks (one class, one volume).
+hd95             95th-percentile symmetric Hausdorff distance (mm) between two
+                 boolean masks, using surface-voxel distances scaled by the voxel
+                 spacing. Values are quantised to roughly voxel-sized steps
+                 (~3.1 mm after 2x downsampling).
+dice_by_third    Prostate Dice in the apex / mid / base thirds of the gland, split
+                 along the slice axis (LPS axis 2 runs foot -> head, so the lowest
+                 third is the apex).
+plot_overlay     Four-panel figure for one case, in axial and sagittal views:
+                 input | ground truth (green) | prediction (yellow) |
+                 error map (red = false positive, blue = false negative).
 
-Matplotlib uses the non-interactive Agg backend: Rangpur compute nodes have
-no display, so figures are written to file instead of shown.
+IoU is not computed here: for a single mask it follows exactly from Dice as
+IoU = Dice / (2 - Dice), which predict.py applies per volume.
 """
+
 import matplotlib
 matplotlib.use("Agg")  # Rangpur compute nodes have no display; save figures to file
 import matplotlib.pyplot as plt

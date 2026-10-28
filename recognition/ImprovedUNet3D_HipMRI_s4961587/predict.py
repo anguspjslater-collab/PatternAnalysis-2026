@@ -1,23 +1,30 @@
 """
-predict.py - evaluate a trained model ONCE on the held-out test set.
+predict.py: one-time test-set evaluation of a trained model.
 
-Author: Angus Slater (s4961587)
-Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
-Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
+Author: Angus Slater (49615878), COMP3710 2026
 
-Usage (on Rangpur, through predict.sh):
-    python predict.py --model unet3d --tag baseline_v2
-    python predict.py --model improved --tag v1
+Loads the best checkpoint (selected on validation prostate Dice in train.py) and
+evaluates it once on the held-out test patients. The patient-level split is
+rebuilt from --split_seed, so the test set is identical to the one held out
+during training. The test set is never used for model selection.
 
-Loads checkpoints/<model>_<tag>.pt (best validation epoch) and reports, per test volume:
-    - hard Dice for all 6 classes
-    - prostate Dice in the apex / mid / base thirds (the spec's boundary dilemma)
-    - prostate HD95 in mm (boundary error), using each scan's voxel spacing
-    - inference time per volume and peak GPU memory
-Outputs:
-    results/test_<run>.json          per-volume rows + summary (mean, std)
-    figures/overlay_<run>_<case>.png worst cases + best case, truth vs prediction
+For every test volume it records:
+  - hard Dice and IoU (= Dice / (2 - Dice)) for all 6 classes
+  - prostate HD95 in mm (using the post-downsampling voxel spacing)
+  - prostate Dice by third (apex / mid / base)
+  - inference time per volume (after one warm-up pass, timed with
+    torch.cuda.synchronize) and peak inference VRAM
+  - ground-truth and predicted prostate voxel counts
+
+Outputs
+  results/test_<run>.json            per-case rows and a mean / std summary
+  figures/overlay_<run>_<case>.png   4-panel overlays (FP / FN error maps) for
+                                     --cases, or the --n_overlays worst cases
+
+Usage (on Rangpur, via predict.sh):
+  sbatch predict.sh --model improved --tag v1 --cases K008_Week0 V027_Week7
 """
+
 import argparse
 import json
 import os
