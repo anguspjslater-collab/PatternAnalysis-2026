@@ -185,7 +185,30 @@ The output is (B, 6, 128, 128, 64), and the model has 9,463,202 parameters (~9.5
 
 ## 5. Training Setup 
 
-The models use the Adam optimser (`lr=1e-3`) and loss function  Dice + cross-entropy (CE) (`DiceCELoss` in `modules.py`): CE + (1 - soft Dice averaged over the 6 classes). CE gives smooth, stable gradients from epoch 1, and its bias towards the background is mediated by the Soft Dice, which weights each class equally. Together this gives stable initial training and class balance. The Adam's momentum plus per-weight adaptive step size is standard for U-Nets and robust without tuning. Further, the learning rate scheudles is cosine annealing -> 0 over 150 epochs, reducing step size to allow model to settle to a minima. The best validation prostate Dice score over the 150 epoch training was saved as the final checkpoint (~70 epochs). Precision was bf16 autocast, loss computed in fp32 to be time and memory efficient. Training seeds 1 / 2 / 42 across all models show run-to-run variation on the same patients. 
+All three models were trained with an identical setup (`train.py`), so that architecture
+is the only variable.
+
+| Setting | Value |
+| --- | --- |
+| Loss | Dice + cross-entropy (`DiceCELoss`): CE + (1 − soft Dice averaged over the 6 classes) |
+| Optimiser | Adam, `lr = 1e-3` |
+| LR schedule | Cosine annealing from 1e-3 to ~0 over 150 epochs |
+| Batch size | 2 volumes |
+| Precision | bf16 autocast; loss computed in fp32 |
+| Model selection | Checkpoint with the best validation prostate Dice |
+| Seeds | Training seeds 42, 1, 2 per model; patient split fixed (`split_seed = 42`) |
+| Hardware | One NVIDIA A100 (Rangpur) |
+
+CE gives smooth, stable gradients from the first epoch, but on its own it is dominated by
+the background; the soft Dice term weights each class equally, so the ~0.1% prostate class
+counts as much as the background. Together they give stable early training and class
+balance. Adam's momentum and per-weight adaptive step size make it the standard choice for
+U-Nets and robust without tuning. Cosine annealing reduces the step size over training so
+the weights settle into a minimum. The epoch with the best validation prostate Dice
+(between 20 and 97 across runs) was kept as the final checkpoint; the test set was never used
+for selection. bf16 autocast roughly halves activation memory and speeds up training on the
+A100, while the loss is computed in fp32 for numerical precision. For the 2D model the loss is
+computed on the restacked volume, so all three models receive an identical training signal.
 
 ## 6. Results
 ### 6.1 Validation 
