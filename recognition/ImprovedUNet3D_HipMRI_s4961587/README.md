@@ -639,7 +639,6 @@ ImprovedUNet3D_HipMRI_s4961587/
 ├── train.sh            # Slurm script for train.py
 ├── predict.sh          # Slurm script for predict.py
 ├── inspect_data.ipynb  # data exploration and orientation checks
-├── feasibility.md      # one-page feasibility review
 ├── figures/            # curves, overlays, per-third chart
 ├── results/            # JSON logs for every run
 ├── checkpoints/        # model weights (git-ignored)
