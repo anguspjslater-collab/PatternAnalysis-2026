@@ -19,16 +19,17 @@
 #SBATCH --time=04:00:00
 #SBATCH --output=unet3d_%j.out
 #SBATCH --error=unet3d_%j.err
-#SBATCH --mail-user=s4961587@student.uq.edu.au
-#SBATCH --mail-type=END,FAIL
+##SBATCH --mail-user=sXXXXXXX@student.uq.edu.au
+##SBATCH --mail-type=END,FAIL
 
 ARGS=("$@")  # save train.py args, then clear them: conda's activate script would otherwise read them
 set --
 
 echo "Job $SLURM_JOB_ID on $(hostname), started $(date)"
 nvidia-smi
+# Activate a PyTorch environment (see README Section 10.1); edit these two lines for your setup.
 source $HOME/miniconda3/bin/activate
 conda activate torch
-cd $HOME/PatternAnalysis-2026/recognition/ImprovedUNet3D_HipMRI_s4961587
+cd "$SLURM_SUBMIT_DIR"   # run from wherever the job was submitted (the project folder)
 python -u train.py "${ARGS[@]}"
 echo "finished $(date)"
