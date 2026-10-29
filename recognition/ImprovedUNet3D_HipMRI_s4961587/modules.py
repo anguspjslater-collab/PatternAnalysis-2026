@@ -14,7 +14,7 @@ Models:
   Segmentation from Sparse Annotation" (MICCAI). Four 2x levels, max-pool down,
   transposed-conv up, DoubleConv blocks, 16-32-64-128-256 channels. ~5.6M params.
 - ImprovedUNet3D (proposed): Isensee et al., 2018, "Brain Tumor Segmentation and
-  Radiomics Survival Prediction: Contribution to the BRATS 2018 Challenge".
+  Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge".
   Residual context modules with dropout, stride-2 conv downsampling, LeakyReLU,
   upsample+conv, localisation modules and deep supervision. ~9.5M params.
 
@@ -183,7 +183,7 @@ class LocalisationModule(nn.Module):
 
 class ImprovedUNet3D(nn.Module):
     """Improved 3D U-Net (Isensee et al., 2018, "Brain Tumor Segmentation and
-    Radiomics Survival Prediction: Contribution to the BRATS 2018 Challenge").
+    Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge").
 
     Differences from UNet3D: residual context modules, stride-2 conv downsampling,
     LeakyReLU, upsample+conv, localisation modules, and deep supervision.
@@ -339,7 +339,7 @@ class DiceCELoss(nn.Module):
 
 
 if __name__ == "__main__":
-    # Shape test on CPU for both models: output shape, parameter count, loss runs.
+    # Shape test on CPU for all three models: output shape, parameter count, loss runs.
     x = torch.randn(1, 1, 128, 128, 64)
     target = torch.randint(0, 6, (1, 128, 128, 64))
     for model in (UNet2D(), UNet3D(), ImprovedUNet3D()):
