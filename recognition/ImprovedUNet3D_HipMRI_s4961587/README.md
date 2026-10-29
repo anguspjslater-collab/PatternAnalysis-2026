@@ -607,8 +607,8 @@ sbatch train.sh --model unet3d   --tag baseline_v2
 sbatch train.sh --model improved --tag v1
 
 # Seed study (validation only): repeat all three models with --seed 1 and --seed 2, e.g.
-sbatch train.sh --model improved --seed 1 --tag s1
-sbatch train.sh --model improved --seed 2 --tag s2
+sbatch train.sh --model improved --seed 1 --tag v1_s1
+sbatch train.sh --model improved --seed 2 --tag v1_s2
 
 # Test set, evaluated once per model, with overlays for the autopsy cases
 sbatch predict.sh --model improved --tag v1 \
