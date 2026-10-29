@@ -579,7 +579,7 @@ All runs used one NVIDIA A100 on UQ's Rangpur cluster (partition `comp3710`).
 ```bash
 conda create -n torch python=3.11
 conda activate torch
-pip install torch numpy nibabel matplotlib scipy
+pip install -r requirements.txt
 ```
 
 ### 10.2 Data
@@ -639,6 +639,7 @@ ImprovedUNet3D_HipMRI_s4961587/
 ├── train.sh            # Slurm script for train.py
 ├── predict.sh          # Slurm script for predict.py
 ├── inspect_data.ipynb  # data exploration and orientation checks
+├── requirements.txt    # exact package versions
 ├── figures/            # curves, overlays, per-third chart
 ├── results/            # JSON logs for every run
 ├── checkpoints/        # model weights (git-ignored)
