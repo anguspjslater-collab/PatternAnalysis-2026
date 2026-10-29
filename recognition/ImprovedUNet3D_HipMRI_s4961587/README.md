@@ -647,7 +647,7 @@ ImprovedUNet3D_HipMRI_s4961587/
 └── .gitignore
 ```
 
-## 11. AI Usage Disclosure
+## 11. Artificial Intelligence Usage Disclosure
 
 I used Claude (Anthropic, Claude Opus, via claude.ai) throughout this project as a
 tutor, code reviewer and writing assistant. Specifically:
