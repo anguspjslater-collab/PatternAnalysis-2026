@@ -723,7 +723,7 @@ Isensee, F., Kickingereder, P., Wick, W., Bendszus, M., & Maier-Hein, K. H. (201
 Brain tumor segmentation and radiomics survival prediction: Contribution to the BRATS
 2017 challenge. In *Brainlesion: Glioma, Multiple Sclerosis, Stroke and Traumatic Brain
 Injuries (BrainLes 2017)* (LNCS 10670, pp. 287–297). Springer.
-https://doi.org/10.1007/978-3-319-75238-9_25 (preprint 2017: arXiv:1802.10508)
+https://doi.org/10.1007/978-3-319-75238-9_25 (preprint 2018: arXiv:1802.10508)
 
 Kingma, D. P., & Ba, J. (2015). Adam: A method for stochastic optimization. In
 *International Conference on Learning Representations (ICLR)*.
