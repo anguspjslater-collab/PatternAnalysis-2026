@@ -1,7 +1,7 @@
 """
 train.py - train a 3D U-Net on HipMRI, validate every epoch, keep the best model.
 
-Author: Angus Slater (s4961587)
+Author: Angus Slater (49615878)
 Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
 Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 
@@ -15,6 +15,10 @@ Outputs, named <model>_<tag>:
     checkpoints/<run>.pt      best weights by validation prostate Dice
     results/<run>.json        settings, per-epoch history, best epoch, time, peak VRAM
     figures/<run>_curves.png  loss and validation Dice curves
+
+Testing is deliberately not done here: predict.py evaluates the held-out test set once,
+after model selection on validation, so test data never influences training or the choice
+of checkpoint.
 """
 import argparse
 import json

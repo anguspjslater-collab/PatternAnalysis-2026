@@ -1,7 +1,7 @@
 """
 modules.py - 3D U-Net models and loss for HipMRI prostate MRI segmentation.
 
-Author: Angus Slater (s4961587)
+Author: Angus Slater (49615878)
 Course: COMP3710 Pattern Recognition, The University of Queensland, 2026
 Project: Improved 3D U-Net for prostate MRI segmentation (HipMRI)
 
@@ -13,8 +13,8 @@ Models:
 - UNet3D (baseline): Cicek et al., 2016, "3D U-Net: Learning Dense Volumetric
   Segmentation from Sparse Annotation" (MICCAI). Four 2x levels, max-pool down,
   transposed-conv up, DoubleConv blocks, 16-32-64-128-256 channels. ~5.6M params.
-- ImprovedUNet3D (proposed): Isensee et al., 2017, "Brain Tumor Segmentation and
-  Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge".
+- ImprovedUNet3D (proposed): Isensee et al., 2018, "Brain Tumor Segmentation and
+  Radiomics Survival Prediction: Contribution to the BRATS 2018 Challenge".
   Residual context modules with dropout, stride-2 conv downsampling, LeakyReLU,
   upsample+conv, localisation modules and deep supervision. ~9.5M params.
 
@@ -72,7 +72,7 @@ class UNet3D(nn.Module):
         super().__init__()
         c1, c2, c3, c4, c5 = (base * 2**i for i in range(5))  # 16, 32, 64, 128, 256
 
-        # max-pool layer used in research paper (Çiçek et al. (2016) - no trainable paramters
+        # max-pool layer used in research paper (Çiçek et al. (2016) - no trainable parameters
         self.pool = nn.MaxPool3d(2)
         self.enc1 = DoubleConv(in_ch, c1)
         self.enc2 = DoubleConv(c1, c2)
@@ -121,7 +121,7 @@ def conv_norm_act(in_ch, out_ch, k=3, stride=1):
 
 
 class ContextModule(nn.Module):
-    """Residual encoder block (Isensee et al., 2017):
+    """Residual encoder block (Isensee et al., 2018):
     x + [IN -> LeakyReLU -> conv -> dropout -> IN -> LeakyReLU -> conv](x).
 
     The identity path lets gradients bypass the convs (He et al., 2016), so the
@@ -182,8 +182,8 @@ class LocalisationModule(nn.Module):
 
 
 class ImprovedUNet3D(nn.Module):
-    """Improved 3D U-Net (Isensee et al., 2017, "Brain Tumor Segmentation and
-    Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge").
+    """Improved 3D U-Net (Isensee et al., 2018, "Brain Tumor Segmentation and
+    Radiomics Survival Prediction: Contribution to the BRATS 2018 Challenge").
 
     Differences from UNet3D: residual context modules, stride-2 conv downsampling,
     LeakyReLU, upsample+conv, localisation modules, and deep supervision.

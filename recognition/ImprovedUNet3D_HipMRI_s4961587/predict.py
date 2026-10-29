@@ -19,7 +19,7 @@ For every test volume it records:
 Outputs
   results/test_<run>.json            per-case rows and a mean / std summary
   figures/overlay_<run>_<case>.png   4-panel overlays (FP / FN error maps) for
-                                     --cases, or the --n_overlays worst cases
+                                     --cases, or the --n_overlays worst cases plus the best
 
 Usage (on Rangpur, via predict.sh):
   sbatch predict.sh --model improved --tag v1 --cases K008_Week0 V027_Week7
