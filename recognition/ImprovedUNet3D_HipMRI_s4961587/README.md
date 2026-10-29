@@ -150,7 +150,9 @@ was done in `load_volume()` in the `dataset.py` file by first normalising the im
 labels stay as whole class IDs, no decimals). Figure 2 shows an example of a downsampled
 image against its corresponding original. Downsampling was required by the task, however,
 it means voxels are of size ~3.1mm (length) and prostate boundaries appear more
-block-like.
+block-like. `inspect_data.ipynb` explores one example scan (B040_Week0): label meanings, class
+fractions, voxel spacing and the downsampling check in Figure 2. The dataset-wide audit
+in Section 2.3 (counts, shapes, spacing, orientation) was run on Rangpur.
 
 ![Figure 2: Downsampled example](figures/downsample_check.png)
 
@@ -689,8 +691,8 @@ Data were provided by the HipMRI Study (Dowling & Greer, 2021; CSIRO and Calvary
 Newcastle), accessed through the COMP3710 course copy on UQ's Rangpur cluster. The HipMRI
 Study is described in Dowling et al. (2015). In line with the HipMRI Study data use terms,
 the data were used only for non-commercial research and education, no attempt was made to
-identify or contact any participant, and no images or labels are included in this
-repository.
+identify or contact any participant, and no image or label volumes (NIfTI files) are
+included in this repository; figures show individual downsampled slices only.
 
 ### References
 
