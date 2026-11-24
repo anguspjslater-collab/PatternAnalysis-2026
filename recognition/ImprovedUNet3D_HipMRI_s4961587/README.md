@@ -282,6 +282,7 @@ is the only variable.
 | Optimiser | Adam, `lr = 1e-3` |
 | LR schedule | Cosine annealing from 1e-3 to ~0 over 150 epochs |
 | Batch size | 2 volumes |
+| Augmentation | None for all reported runs (`--augment` left–right flips implemented but off) |
 | Precision | bf16 autocast; loss computed in fp32 |
 | Model selection | Checkpoint with the best validation prostate Dice |
 | Seeds | Training seeds 42, 1, 2 per model; patient split fixed (`split_seed = 42`) |
@@ -554,8 +555,10 @@ These rules are proposed here, not tested.
   rate, schedule and batch size (2 volumes). This keeps the comparison fair, but none of
   the models was tuned individually. In particular, for the 2D model a batch of 2 volumes
   is 128 slices, and a different batch size or learning rate might narrow its gap.
-- **Augmentation** was limited to random left–right flips. Stronger
-  augmentation (intensity, elastic, small rotations) might help the low-contrast and
+- **No augmentation.** None of the reported runs used data augmentation (every log in
+  `results/` records `augment: false`). Random left–right flips are implemented
+  (`--augment` in `train.py`, applied in `dataset.py`) but were not switched on.
+  Augmentation (flips, intensity changes, small rotations) might help the low-contrast and
   unusual-size cases in Section 7.
 - **Checkpoint selection on validation prostate Dice** favours the prostate over the
   other classes. A different selection metric could change the other per-class results
