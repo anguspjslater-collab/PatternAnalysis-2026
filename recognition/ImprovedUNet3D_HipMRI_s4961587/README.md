@@ -349,7 +349,8 @@ middle of the gland, which the global Dice score hides. The Improved model narro
 apex gap to ~0.06, but its base gap remains ~0.09. 3D context raises all three thirds by
 a similar amount (~+0.04), so it improves the model overall but does not by itself close
 the gap at the ends. The Improved model's only clear gain over the 3D baseline is at the
-apex (+0.034); its base is no better.
+apex (+0.034); its base is no better. Over all three training seeds the apex gain is
+smaller (+0.021), and the Improved model has the lowest base extent error (Section 6.5).
 
 ### 6.4 Resources
 
@@ -363,6 +364,68 @@ At this downsampled resolution, 3D costs ~1.4–1.7x the 2D training time and fa
 the "5–10x" the task anticipated; the 3D baseline even uses less training memory than the
 2D model, because the 2D network keeps all 64 slices at every level while 3D pooling also
 halves the slice axis. All models infer in under 30 ms per volume on one A100.
+
+### 6.5 Organ interfaces, extent errors and seed robustness
+
+*Added in response to the code review. Computed by `interface_errors` (`utils.py`) and
+`review_analysis.py`; full output in `results/review_analysis.txt`.*
+
+**Leakage** is predicted prostate that lies inside the true bladder or rectum
+(over-contouring into an organ at risk); **lost** is true prostate labelled as that organ
+(under-contouring). **Extent** is the distance along the foot–head axis between the true
+apex/base and where the predicted gland starts/ends; + means the prediction extends too far.
+Voxels are ~3.1 mm along this axis.
+
+Table 4. Organ-interface and extent errors (test set, mean ± std over 35 scans)
+
+| Metric | 2D U-Net | 3D U-Net | Improved 3D U-Net |
+| --- | --- | --- | --- |
+| Leakage into bladder (mL) | 0.75 ± 1.32 | 0.12 ± 0.30 | **0.11 ± 0.23** |
+| Leakage into bladder (% of predicted prostate) | 3.0 ± 5.3 | 0.5 ± 1.4 | **0.5 ± 1.1** |
+| Prostate lost to bladder (mL) | 0.70 ± 1.08 | **0.24 ± 0.39** | 0.29 ± 0.46 |
+| Leakage into rectum (mL) | 0.08 ± 0.16 | **0.01 ± 0.03** | 0.03 ± 0.12 |
+| Prostate lost to rectum (mL) | 0.01 ± 0.04 | 0.01 ± 0.04 | 0.01 ± 0.04 |
+| Apex extent error, mean absolute (mm) | 3.4 | 4.0 | **2.7** |
+| Base extent error, mean absolute (mm) | 9.4 | 5.6 | **2.9** |
+| Base extent error, signed (mm) | +8.3 ± 18.8 | +4.9 ± 12.3 | **+1.7 ± 4.6** |
+
+- **The bladder neck is the critical interface.** The 2D model leaks about 6× more
+  prostate into the bladder than either 3D model, while rectum leakage is below 0.1 mL for
+  every model. This matches the failure autopsy (Section 7), where errors cluster at the
+  bladder neck.
+- **Most contours start and end on the right slice.** Every extent error has a median of
+  0 mm; the means are driven by a few scans where the prediction extends above the true
+  base (positive base errors, towards the bladder).
+- **The Improved model overshoots the base least.** Its base Dice is no better than the
+  baseline's (Section 6.3), but its mean absolute base extent error is 2.9 mm (under one
+  slice) against 5.6 mm, with a much smaller spread.
+
+Table 5. Test results for all three training seeds (each seed averaged over 35 scans; mean ± std over seeds)
+
+| Model | Prostate Dice | Apex | Mid | Base | HD95 (mm) |
+| --- | --- | --- | --- | --- | --- |
+| 2D U-Net | 0.781 ± 0.005 | 0.752 ± 0.010 | 0.849 ± 0.006 | 0.750 ± 0.019 | 6.44 ± 0.27 |
+| 3D U-Net | 0.842 ± 0.002 | 0.816 ± 0.015 | 0.896 ± 0.002 | 0.809 ± 0.014 | 5.16 ± 0.09 |
+| Improved 3D U-Net | **0.846 ± 0.005** | **0.837 ± 0.006** | 0.897 ± 0.007 | 0.807 ± 0.011 | **5.04 ± 0.21** |
+
+Across seeds, 3D context is a robust gain (+0.06 Dice). The Improved model's overall lead
+over the baseline (+0.004) is within seed noise. Its apex lead shrinks from +0.034 (seed 42)
+to +0.021 on average and holds in two of three seeds (seed 2: 0.828 vs 0.837); the base is
+tied.
+
+Table 6. Per-patient prostate Dice (each patient's scans averaged first; mean ± std over 7 patients)
+
+| Model | Prostate Dice | Apex | Base |
+| --- | --- | --- | --- |
+| 2D U-Net | 0.798 ± 0.059 | 0.707 | 0.782 |
+| 3D U-Net | 0.844 ± 0.046 | 0.762 | 0.820 |
+| Improved 3D U-Net | **0.850 ± 0.032** | **0.807** | 0.818 |
+
+Four test patients contribute 8 scans each and three contribute one, so the per-scan mean
+is dominated by four people. Weighting patients equally gives the same ranking. The
+Improved model has the smallest spread between patients and the best per-patient apex
+(+0.045 over the baseline); its weakest patients are T014 (0.815) and K018 (0.818), the
+two failure modes in Section 7.
 
 ## 7. Failure autopsy
 
@@ -482,15 +545,18 @@ On validation, the Improved model and the 3D baseline are statistically tied
 (0.870 ± 0.001 vs 0.868 ± 0.002). On test it is slightly better overall (0.849 vs
 0.842), but its real advantages are:
 
-- **the apex**, the hardest region (0.839 vs 0.805 Dice);
+- **the apex**, the hardest region (0.839 vs 0.805 Dice; 0.837 ± 0.006 vs
+  0.816 ± 0.015 over three seeds);
 - **consistency**: prostate HD95 4.7 ± 1.3 mm vs 5.3 ± 2.3 mm, so fewer bad outliers
   for a clinician to catch;
+- **the base extent**: mean absolute base extent error 2.9 mm vs 5.6 mm, so it rarely
+  overshoots into the bladder neck (Section 6.5);
 - **higher Dice on all five classes**.
 
 The price is small: 9.5M vs 5.6M parameters, 17 vs 14 minutes of training, and 27 vs 23
 ms per volume. It is not a clear win everywhere: its base is no better (0.805 vs 0.813),
-and it does worse on the large, low-contrast gland in K018_Week7. The test results come
-from 7 patients and a single training seed. If a simpler model is preferred, the 3D
+and it does worse on the large, low-contrast gland in K018_Week7. The test results come from 7 patients, and over all three training seeds the overall gap
+is within noise (0.846 ± 0.005 vs 0.842 ± 0.002). If a simpler model is preferred, the 3D
 baseline is an acceptable alternative.
 
 ### 8.3 What still needs a human
@@ -501,11 +567,16 @@ baseline is an acceptable alternative.
 | **Bladder-neck boundary** | Models extend the prostate into the bladder neck (T014, K008) | Check the superior edge, especially next to a bright bladder |
 | **Small glands** | A one-voxel (~3 mm) error is a large share of the volume (T014) | Review in full |
 | **Large or low-contrast glands** | Systematic under-segmentation (K018) | Review in full; expect the contour to be too small |
-| **Disconnected prostate islands** | Not seen in 3D, but a clear sign of failure (2D, K008) | Reject the draft and re-contour |
+| **Disconnected prostate islands** | More than one component in 6/35 2D, 4/35 3D and 2/35 Improved predictions (see below) | Remove stray islands, then review the main contour |
 
-A simple automatic check could flag the last three situations before review: predicted
-prostate volume far outside the training range, or more than one connected component.
-These rules are proposed here, not tested.
+Two simple automatic flags were tested on the test set (`review_analysis.py`). No
+prediction fell outside the training prostate volume range (232–3,333 downsampled
+voxels), so the volume rule never fired. The multi-component rule flagged 6/35 2D
+predictions (mean Dice 0.742 vs 0.797 unflagged, including autopsy cases K008_Week0 and
+T014_Week2), but only 4/35 3D and 2/35 Improved predictions, whose flagged scans were not
+worse than average, and it caught none of the 3D autopsy failures. Simple shape checks
+therefore catch the 2D model's disconnected islands, but not the boundary errors that
+remain in 3D; those still need clinician review at the apex, base and bladder neck.
 
 ### 8.4 Before clinical use
 
@@ -525,10 +596,10 @@ These rules are proposed here, not tested.
   patient from different weeks are highly correlated (T014 provides two of the five worst
   cases), so the effective sample size is closer to 7 than 35. Differences of ~0.01 Dice
   between models on test should not be over-interpreted.
-- **One split, one test seed.** All results use a single patient-level split
-  (`split_seed=42`). Seeds were repeated (×3) only on validation; each model was
-  evaluated on test once, from its seed-42 checkpoint. A different split, or
-  cross-validation, could reorder the two 3D models.
+- **One split.** All results use a single patient-level split (`split_seed=42`). All
+  three training seeds of every model were scored on test after the code review
+  (Section 6.5), but a different split, or cross-validation, could still reorder the two
+  3D models.
 - **One dataset, one site.** All scans come from a single study. Performance on other
   scanners, protocols or patient populations is untested.
 - **Ground-truth uncertainty.** The apex and base are also where manual contours differ
@@ -635,6 +706,16 @@ Run tags: `unet3d_baseline.json` is the first baseline run, kept as a record of 
 after the training script logged CE and Dice separately). Seed runs use the suffixes
 `_s1` and `_s2` (for the baseline, `unet3d_baseline_s1` and `_s2`).
 
+The code-review analyses (Section 6.5) score the seed-1 and seed-2 checkpoints on test and
+summarise every test JSON:
+
+```bash
+for t in v1_s1 v1_s2; do sbatch predict.sh --model improved --tag $t --n_overlays 0; done
+for t in baseline_s1 baseline_s2; do sbatch predict.sh --model unet3d --tag $t --n_overlays 0; done
+for t in v1_s1 v1_s2; do sbatch predict.sh --model unet2d --tag $t --n_overlays 0; done
+python review_analysis.py | tee results/review_analysis.txt
+```
+
 ### 10.4 Files
 
 ```
@@ -648,6 +729,7 @@ ImprovedUNet3D_HipMRI_s4961587/
 ├── predict.sh          # Slurm script for predict.py
 ├── inspect_data.ipynb  # data exploration and orientation checks
 ├── requirements.txt    # exact package versions
+├── review_analysis.py  # interface errors, all-seed test results, per-patient Dice, flags
 ├── figures/            # curves, overlays, per-third chart
 ├── results/            # JSON logs for every run
 ├── checkpoints/        # model weights (git-ignored)
@@ -685,6 +767,13 @@ tutor, code reviewer and writing assistant. Specifically:
 - Claude edited Section 5, condensed my feasibility review to one page, and produced
   the architecture diagrams (Appendix A) and `figures/prostate_dice_by_third.png`.
 - Sections 1, 3 and 4.1–4.2 are my own writing; Claude checked them for errors.
+
+**After the code review**
+- Claude wrote `interface_errors` (`utils.py`), the connected-component count in
+  `predict.py`, `review_analysis.py` and the orientation check in `load_volume`, and
+  drafted Section 6.5 and the related edits to Sections 6.3, 8, 9 and 10. I ran everything
+  on Rangpur, checked `interface_errors` on a synthetic example with known answers, and
+  confirmed the original test numbers reproduced exactly.
 
 **What I did myself:** chose the topic and scope, ran every experiment, made the final
 decisions on models and evaluation, and verified all results. I have reviewed all
