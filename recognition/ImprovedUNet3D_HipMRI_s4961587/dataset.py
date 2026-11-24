@@ -131,8 +131,15 @@ def load_volume(img_path, lab_path, shape=TARGET_SHAPE):
         image: (1, X, Y, Z) float32, z-scored, trilinear-downsampled.
         mask: (X, Y, Z) uint8 labels 0-5, nearest-downsampled.
     """
-    img = nib.load(img_path).get_fdata(dtype=np.float32)[:, :, :128]
-    lab = nib.load(lab_path).get_fdata(dtype=np.float32)[:, :, :128]
+    img_nii, lab_nii = nib.load(img_path), nib.load(lab_path)
+    # The apex/base thirds (utils.dice_by_third) and the crop below assume axis 2 runs
+    # foot -> head (LPS). Check every scan so a new data source cannot silently flip them.
+    for path, nii in ((img_path, img_nii), (lab_path, lab_nii)):
+        codes = nib.aff2axcodes(nii.affine)
+        if codes != ("L", "P", "S"):
+            raise ValueError(f"{path}: expected LPS orientation, got {''.join(codes)}")
+    img = img_nii.get_fdata(dtype=np.float32)[:, :, :128]
+    lab = lab_nii.get_fdata(dtype=np.float32)[:, :, :128]
 
     # Per-volume z-score: MRI brightness has no fixed scale between scans.
     img = (img - img.mean()) / (img.std() + 1e-8)
