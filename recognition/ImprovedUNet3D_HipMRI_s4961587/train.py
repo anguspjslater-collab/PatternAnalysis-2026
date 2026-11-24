@@ -53,6 +53,8 @@ def parse_args():
     p.add_argument("--split_seed", type=int, default=42,
                    help="patient split seed; keep fixed so every run uses the same patients")
     p.add_argument("--tag", default="baseline", help="run name suffix")
+    p.add_argument("--base", type=int, default=16,
+                   help="channels at the first level (model width); 16 for all reported runs")
     return p.parse_args()
 
 
@@ -140,7 +142,7 @@ def main():
     sizes = ", ".join(f"{k} {len(v.dataset)}" for k, v in loaders.items())
     print(f"data loaded in {time.time() - t0:.0f}s ({sizes})", flush=True)
 
-    model = MODELS[args.model]().to(device)
+    model = MODELS[args.model](base=args.base).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     loss_fn = DiceCELoss(NUM_CLASSES)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)  # Adam: standard for U-Nets, little tuning needed

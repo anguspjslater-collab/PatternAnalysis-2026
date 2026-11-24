@@ -52,6 +52,7 @@ def parse_args():
     p.add_argument("--tag", required=True, help="run tag used in training, e.g. v1")
     p.add_argument("--data_dir", default=ROOT, help="folder containing semantic_MRs/")
     p.add_argument("--split_seed", type=int, default=42, help="must match training")
+    p.add_argument("--base", type=int, default=16, help="model width; must match training")
     p.add_argument("--n_overlays", type=int, default=4, help="worst cases to plot (+ the best)")
     p.add_argument("--cases", nargs="*", default=None,
                 help="specific cases to overlay, e.g. T014_Week7 K008_Week0 (default: worst + best)")
@@ -77,7 +78,7 @@ def main():
     os.makedirs("results", exist_ok=True)
     os.makedirs("figures", exist_ok=True)
 
-    model = MODELS[args.model]().to(device)
+    model = MODELS[args.model](base=args.base).to(device)
     model.load_state_dict(torch.load(f"checkpoints/{run}.pt", map_location=device))
     model.eval()  # inference mode: dropout off
 
