@@ -12,6 +12,8 @@ For every test volume it records:
   - hard Dice and IoU (= Dice / (2 - Dice)) for all 6 classes
   - prostate HD95 in mm (using the post-downsampling voxel spacing)
   - prostate Dice by third (apex / mid / base)
+  - prostate leakage into the bladder and rectum (mL and % of the prediction),
+    prostate lost to them (mL), and signed apex/base extent errors (mm)
   - inference time per volume (after one warm-up pass, timed with
     torch.cuda.synchronize) and peak inference VRAM
   - ground-truth and predicted prostate voxel counts
@@ -36,7 +38,8 @@ import torch
 
 from dataset import ROOT, TARGET_SHAPE, HipMRI3D, list_pairs, split_by_patient
 from train import MODELS, PROSTATE
-from utils import CLASS_NAMES, binary_dice, dice_by_third, dice_per_class, hd95, plot_overlay
+from utils import (CLASS_NAMES, binary_dice, dice_by_third, dice_per_class, hd95,
+                   interface_errors, plot_overlay)
 
 
 def parse_args():
@@ -104,13 +107,15 @@ def main():
         pred = logits.argmax(1)[0].cpu().numpy()
         gt = lab.numpy()
         p_pro, g_pro = pred == PROSTATE, gt == PROSTATE
+        spacing = downsampled_spacing(img_path)  # mm per voxel after downsampling
         rows.append({
             "case": os.path.basename(img_path).replace("_LFOV.nii.gz", ""),
             "dice": dict(zip(CLASS_NAMES, dice)),
             "iou": {c: d / (2 - d) for c, d in zip(CLASS_NAMES, dice)}, #Dice / (2 - Dice) holds exactly for each binary mask pair
             "prostate_dice": binary_dice(p_pro, g_pro),
-            "prostate_hd95_mm": hd95(p_pro, g_pro, downsampled_spacing(img_path)),
+            "prostate_hd95_mm": hd95(p_pro, g_pro, spacing),
             "prostate_dice_thirds": dice_by_third(p_pro, g_pro),
+            "interface": interface_errors(pred, gt, spacing),  # bladder/rectum leakage, apex/base extent
             "infer_ms": ms,
             "prostate_gt_voxels": int(g_pro.sum()),
             "prostate_pred_voxels": int(p_pro.sum())  # > gt means over-segmentation
@@ -132,6 +137,7 @@ def main():
         "prostate_hd95_mm": stat([r["prostate_hd95_mm"] for r in rows]),
         "prostate_dice_thirds": {t: stat([r["prostate_dice_thirds"][t] for r in rows])
                                  for t in ("apex", "mid", "base")},
+        "interface": {k: stat([r["interface"][k] for r in rows]) for k in rows[0]["interface"]},
         "infer_ms": stat([r["infer_ms"] for r in rows]),
         "peak_vram_gb": torch.cuda.max_memory_allocated() / 1e9 if device.type == "cuda" else None,
     }
@@ -158,6 +164,8 @@ def main():
             f"IoU {summary['iou'][c]['mean']:.3f} ± {summary['iou'][c]['std']:.3f}")
     print(f"  prostate HD95 {h['mean']:.1f} ± {h['std']:.1f} mm (n={h['n']})")
     print("  prostate Dice by third: " + ", ".join(f"{k} {v['mean']:.3f}" for k, v in t.items()))
+    for k, v in summary["interface"].items():
+        print(f"  {k:18s} {v['mean']:6.2f} ± {v['std']:5.2f}")
     print(f"  inference {summary['infer_ms']['mean']:.0f} ms/volume | peak VRAM {summary['peak_vram_gb']} GB")
 
 

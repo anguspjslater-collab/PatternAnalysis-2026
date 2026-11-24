@@ -19,6 +19,8 @@ hd95             95th-percentile symmetric Hausdorff distance (mm) between two
 dice_by_third    Prostate Dice in the apex / mid / base thirds of the gland, split
                  along the slice axis (LPS axis 2 runs foot -> head, so the lowest
                  third is the apex).
+interface_errors Prostate leakage into the bladder/rectum, prostate lost to them,
+                 and signed apex/base extent errors in mm.
 plot_overlay     Four-panel figure for one case, in axial and sagittal views:
                  input | ground truth (green) | prediction (yellow) |
                  error map (red = false positive, blue = false negative).
@@ -187,3 +189,42 @@ def plot_overlay(img, gt, pred, title, path, cls=5):
     fig.tight_layout()
     fig.savefig(path, dpi=110)
     plt.close(fig)
+
+def interface_errors(pred, gt, spacing, cls=5, neighbours=(("bladder", 3), ("rectum", 4))):
+    """Prostate errors at the organ interfaces, in physical units.
+
+    Leakage: predicted prostate voxels that lie inside a true neighbouring organ
+    (over-contouring into the bladder or rectum). Lost: true prostate voxels the model
+    labelled as that organ (under-contouring at the interface). Extent: how far the
+    predicted gland starts/ends from the true apex/base along the foot-head axis
+    (axis 2, LPS), signed so + means the prediction extends too far.
+
+    Args:
+        pred, gt: (X, Y, Z) integer label volumes.
+        spacing: voxel size in mm per axis (after downsampling).
+        cls: prostate label.
+        neighbours: (name, label) pairs of the adjacent organs.
+
+    Returns:
+        dict with leak_<organ>_ml, leak_<organ>_pct (% of predicted prostate),
+        lost_<organ>_ml, apex_extent_mm and base_extent_mm (NaN where undefined).
+    """
+    voxel_ml = float(np.prod(spacing)) / 1000.0  # mm^3 per voxel -> mL
+    p, g = pred == cls, gt == cls
+    n_pred = int(p.sum())
+    out = {}
+    for name, k in neighbours:
+        leak = int((p & (gt == k)).sum())    # predicted prostate inside the true organ
+        lost = int((g & (pred == k)).sum())  # true prostate predicted as the organ
+        out[f"leak_{name}_ml"] = leak * voxel_ml
+        out[f"leak_{name}_pct"] = 100.0 * leak / n_pred if n_pred else float("nan")
+        out[f"lost_{name}_ml"] = lost * voxel_ml
+    zg = np.where(g.any(axis=(0, 1)))[0]  # slices containing true prostate
+    zp = np.where(p.any(axis=(0, 1)))[0]  # slices containing predicted prostate
+    if len(zg) and len(zp):
+        sz = float(spacing[2])
+        out["apex_extent_mm"] = float(zg.min() - zp.min()) * sz  # + = extends below the true apex
+        out["base_extent_mm"] = float(zp.max() - zg.max()) * sz  # + = extends above the true base
+    else:
+        out["apex_extent_mm"] = out["base_extent_mm"] = float("nan")
+    return out
