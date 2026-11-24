@@ -16,7 +16,8 @@ For every test volume it records:
     prostate lost to them (mL), and signed apex/base extent errors (mm)
   - inference time per volume (after one warm-up pass, timed with
     torch.cuda.synchronize) and peak inference VRAM
-  - ground-truth and predicted prostate voxel counts
+  - ground-truth and predicted prostate voxel counts, and the number of connected
+    prostate components in the prediction (>1 means disconnected islands)
 
 Outputs
   results/test_<run>.json            per-case rows and a mean / std summary
@@ -35,6 +36,7 @@ import time
 import nibabel as nib
 import numpy as np
 import torch
+from scipy import ndimage
 
 from dataset import ROOT, TARGET_SHAPE, HipMRI3D, list_pairs, split_by_patient
 from train import MODELS, PROSTATE
@@ -118,7 +120,8 @@ def main():
             "interface": interface_errors(pred, gt, spacing),  # bladder/rectum leakage, apex/base extent
             "infer_ms": ms,
             "prostate_gt_voxels": int(g_pro.sum()),
-            "prostate_pred_voxels": int(p_pro.sum())  # > gt means over-segmentation
+            "prostate_pred_voxels": int(p_pro.sum()),  # > gt means over-segmentation
+            "prostate_components": int(ndimage.label(p_pro)[1]),  # >1 = disconnected islands
         })
         preds.append(pred)
         r = rows[-1]

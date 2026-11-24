@@ -88,9 +88,51 @@
     "n": 35
    }
   },
+  "interface": {
+   "leak_bladder_ml": {
+    "mean": 0.11934212606034372,
+    "std": 0.30395722391746965,
+    "n": 35
+   },
+   "leak_bladder_pct": {
+    "mean": 0.5272913298541451,
+    "std": 1.4240333721048357,
+    "n": 35
+   },
+   "lost_bladder_ml": {
+    "mean": 0.24229381464155658,
+    "std": 0.3856004439233665,
+    "n": 35
+   },
+   "leak_rectum_ml": {
+    "mean": 0.005266732828957694,
+    "std": 0.030710065768654808,
+    "n": 35
+   },
+   "leak_rectum_pct": {
+    "mean": 0.01892147587511826,
+    "std": 0.11033021560729044,
+    "n": 35
+   },
+   "lost_rectum_ml": {
+    "mean": 0.007959956995078496,
+    "std": 0.035737815080859596,
+    "n": 35
+   },
+   "apex_extent_mm": {
+    "mean": 1.6937119347708567,
+    "std": 13.431888211459261,
+    "n": 35
+   },
+   "base_extent_mm": {
+    "mean": 4.902851050240653,
+    "std": 12.261579839998248,
+    "n": 35
+   }
+  },
   "infer_ms": {
-   "mean": 23.31878117152623,
-   "std": 0.056787108478006935,
+   "mean": 23.186274937220983,
+   "std": 0.032284203437005506,
    "n": 35
   },
   "peak_vram_gb": 0.32127488
@@ -121,9 +163,20 @@
     "mid": 0.8810916179337231,
     "base": 0.8581157775255391
    },
-   "infer_ms": 23.261547088623047,
+   "interface": {
+    "leak_bladder_ml": 0.15424780547618866,
+    "leak_bladder_pct": 0.37735849056603776,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -9.3599853515625,
+    "base_extent_mm": 6.239990234375
+   },
+   "infer_ms": 23.23627471923828,
    "prostate_gt_voxels": 1287,
-   "prostate_pred_voxels": 1060
+   "prostate_pred_voxels": 1060,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week0",
@@ -150,9 +203,20 @@
     "mid": 0.9069767441860465,
     "base": 0.8683693516699411
    },
-   "infer_ms": 23.28777313232422,
+   "interface": {
+    "leak_bladder_ml": 0.4055384278297425,
+    "leak_bladder_pct": 1.4569536423841059,
+    "lost_bladder_ml": 0.1843356490135193,
+    "leak_rectum_ml": 0.1843356490135193,
+    "leak_rectum_pct": 0.6622516556291391,
+    "lost_rectum_ml": 0.03686712980270386,
+    "apex_extent_mm": -3.1199951171875,
+    "base_extent_mm": 3.1199951171875
+   },
+   "infer_ms": 23.236989974975586,
    "prostate_gt_voxels": 824,
-   "prostate_pred_voxels": 755
+   "prostate_pred_voxels": 755,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week1",
@@ -179,9 +243,20 @@
     "mid": 0.8988235294117647,
     "base": 0.8444444444444444
    },
-   "infer_ms": 23.25725555419922,
+   "interface": {
+    "leak_bladder_ml": 0.07042089585447683,
+    "leak_bladder_pct": 0.3418803418803419,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -3.119999885559082,
+    "base_extent_mm": 6.239999771118164
+   },
+   "infer_ms": 23.17976951599121,
    "prostate_gt_voxels": 568,
-   "prostate_pred_voxels": 585
+   "prostate_pred_voxels": 585,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week2",
@@ -208,9 +283,20 @@
     "mid": 0.8706896551724138,
     "base": 0.886021505376344
    },
-   "infer_ms": 23.291349411010742,
+   "interface": {
+    "leak_bladder_ml": 1.5844677351415155,
+    "leak_bladder_pct": 7.269789983844911,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.21126236468553541,
+    "apex_extent_mm": -6.239990234375,
+    "base_extent_mm": 6.239990234375
+   },
+   "infer_ms": 23.160219192504883,
    "prostate_gt_voxels": 529,
-   "prostate_pred_voxels": 619
+   "prostate_pred_voxels": 619,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week3",
@@ -237,9 +323,20 @@
     "mid": 0.8842105263157894,
     "base": 0.8711943793911007
    },
-   "infer_ms": 23.381948471069336,
+   "interface": {
+    "leak_bladder_ml": 0.1408415764570236,
+    "leak_bladder_pct": 0.6611570247933884,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 6.239990234375
+   },
+   "infer_ms": 23.260116577148438,
    "prostate_gt_voxels": 469,
-   "prostate_pred_voxels": 605
+   "prostate_pred_voxels": 605,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week4",
@@ -266,9 +363,20 @@
     "mid": 0.8985507246376812,
     "base": 0.9070294784580499
    },
-   "infer_ms": 23.282766342163086,
+   "interface": {
+    "leak_bladder_ml": 0.7746286705136298,
+    "leak_bladder_pct": 3.9215686274509802,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 6.239990234375
+   },
+   "infer_ms": 23.165225982666016,
    "prostate_gt_voxels": 461,
-   "prostate_pred_voxels": 561
+   "prostate_pred_voxels": 561,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week5",
@@ -295,9 +403,20 @@
     "mid": 0.8929503916449086,
     "base": 0.7331670822942643
    },
-   "infer_ms": 23.331880569458008,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 3.1199951171875
+   },
+   "infer_ms": 23.17023277282715,
    "prostate_gt_voxels": 429,
-   "prostate_pred_voxels": 571
+   "prostate_pred_voxels": 571,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week6",
@@ -324,9 +443,20 @@
     "mid": 0.8960396039603961,
     "base": 0.8009708737864077
    },
-   "infer_ms": 23.294448852539062,
+   "interface": {
+    "leak_bladder_ml": 0.035210566315799954,
+    "leak_bladder_pct": 0.17985611510791366,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -3.1200103759765625,
+    "base_extent_mm": 3.1200103759765625
+   },
+   "infer_ms": 23.1931209564209,
    "prostate_gt_voxels": 484,
-   "prostate_pred_voxels": 556
+   "prostate_pred_voxels": 556,
+   "prostate_components": 1
   },
   {
    "case": "T014_Week7",
@@ -353,9 +483,20 @@
     "mid": 0.9041095890410958,
     "base": 0.7142857142857143
    },
-   "infer_ms": 23.422956466674805,
+   "interface": {
+    "leak_bladder_ml": 0.5985766999423503,
+    "leak_bladder_pct": 3.0357142857142856,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 6.239990234375
+   },
+   "infer_ms": 23.19931983947754,
    "prostate_gt_voxels": 414,
-   "prostate_pred_voxels": 560
+   "prostate_pred_voxels": 560,
+   "prostate_components": 1
   },
   {
    "case": "J026_Week0",
@@ -382,9 +523,20 @@
     "mid": 0.9014844804318488,
     "base": 0.6891385767790262
    },
-   "infer_ms": 23.336410522460938,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.12187480926513672,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 12.47998046875
+   },
+   "infer_ms": 23.145675659179688,
    "prostate_gt_voxels": 832,
-   "prostate_pred_voxels": 646
+   "prostate_pred_voxels": 646,
+   "prostate_components": 2
   },
   {
    "case": "J026_Week1",
@@ -411,9 +563,20 @@
     "mid": 0.8908554572271387,
     "base": 0.7224334600760456
    },
-   "infer_ms": 23.50473403930664,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 24.9599609375
+   },
+   "infer_ms": 23.22244644165039,
    "prostate_gt_voxels": 686,
-   "prostate_pred_voxels": 607
+   "prostate_pred_voxels": 607,
+   "prostate_components": 2
   },
   {
    "case": "J026_Week2",
@@ -440,9 +603,20 @@
     "mid": 0.88,
     "base": 0.8082595870206489
    },
-   "infer_ms": 23.3004093170166,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 3.1199951171875
+   },
+   "infer_ms": 23.18286895751953,
    "prostate_gt_voxels": 650,
-   "prostate_pred_voxels": 705
+   "prostate_pred_voxels": 705,
+   "prostate_components": 1
   },
   {
    "case": "J026_Week3",
@@ -469,9 +643,20 @@
     "mid": 0.8910891089108911,
     "base": 0.8824742268041237
    },
-   "infer_ms": 23.44346046447754,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.1408415764570236,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.195981979370117,
    "prostate_gt_voxels": 876,
-   "prostate_pred_voxels": 763
+   "prostate_pred_voxels": 763,
+   "prostate_components": 1
   },
   {
    "case": "J026_Week4",
@@ -498,9 +683,20 @@
     "mid": 0.9248895434462445,
     "base": 0.9146341463414634
    },
-   "infer_ms": 23.305892944335938,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 3.1199951171875
+   },
+   "infer_ms": 23.172616958618164,
    "prostate_gt_voxels": 689,
-   "prostate_pred_voxels": 707
+   "prostate_pred_voxels": 707,
+   "prostate_components": 1
   },
   {
    "case": "J026_Week5",
@@ -527,9 +723,20 @@
     "mid": 0.9080932784636488,
     "base": 0.8282828282828283
    },
-   "infer_ms": 23.347139358520508,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.3873143352568149,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 3.1199951171875,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.203134536743164,
    "prostate_gt_voxels": 792,
-   "prostate_pred_voxels": 661
+   "prostate_pred_voxels": 661,
+   "prostate_components": 1
   },
   {
    "case": "J026_Week6",
@@ -556,9 +763,20 @@
     "mid": 0.9388971684053651,
     "base": 0.8595744680851064
    },
-   "infer_ms": 23.27585220336914,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.114442825317383,
    "prostate_gt_voxels": 667,
-   "prostate_pred_voxels": 684
+   "prostate_pred_voxels": 684,
+   "prostate_components": 1
   },
   {
    "case": "J026_Week7",
@@ -585,9 +803,20 @@
     "mid": 0.9237170596393898,
     "base": 0.8869565217391304
    },
-   "infer_ms": 23.33235740661621,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0352103941142559,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.258447647094727,
    "prostate_gt_voxels": 733,
-   "prostate_pred_voxels": 730
+   "prostate_pred_voxels": 730,
+   "prostate_components": 1
   },
   {
    "case": "T009_Week0",
@@ -614,9 +843,20 @@
     "mid": 0.963984674329502,
     "base": 0.8643533123028391
    },
-   "infer_ms": 23.29707145690918,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.09140610694885254,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -3.1199951171875,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.18429946899414,
    "prostate_gt_voxels": 1250,
-   "prostate_pred_voxels": 1233
+   "prostate_pred_voxels": 1233,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week0",
@@ -643,9 +883,20 @@
     "mid": 0.8453267162944582,
     "base": 0.8237410071942446
    },
-   "infer_ms": 23.316621780395508,
+   "interface": {
+    "leak_bladder_ml": 0.03046870231628418,
+    "leak_bladder_pct": 0.09066183136899365,
+    "lost_bladder_ml": 0.03046870231628418,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -6.239990234375,
+    "base_extent_mm": 15.5999755859375
+   },
+   "infer_ms": 23.17523956298828,
    "prostate_gt_voxels": 1518,
-   "prostate_pred_voxels": 1103
+   "prostate_pred_voxels": 1103,
+   "prostate_components": 3
   },
   {
    "case": "V027_Week1",
@@ -672,9 +923,20 @@
     "mid": 0.8975903614457831,
     "base": 0.6978557504873294
    },
-   "infer_ms": 23.30493927001953,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.1408415764570236,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.19955825805664,
    "prostate_gt_voxels": 1077,
-   "prostate_pred_voxels": 1090
+   "prostate_pred_voxels": 1090,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week2",
@@ -701,9 +963,20 @@
     "mid": 0.9280517380759903,
     "base": 0.865874363327674
    },
-   "infer_ms": 23.244619369506836,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.31689354702830314,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -3.1199951171875,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.20575714111328,
    "prostate_gt_voxels": 1254,
-   "prostate_pred_voxels": 1023
+   "prostate_pred_voxels": 1023,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week3",
@@ -730,9 +1003,20 @@
     "mid": 0.9406952965235174,
     "base": 0.9279437609841827
    },
-   "infer_ms": 23.32019805908203,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0352103941142559,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": -3.1199951171875,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.13518524169922,
    "prostate_gt_voxels": 1145,
-   "prostate_pred_voxels": 992
+   "prostate_pred_voxels": 992,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week4",
@@ -759,9 +1043,20 @@
     "mid": 0.951048951048951,
     "base": 0.8247422680412371
    },
-   "infer_ms": 23.33807945251465,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 1.1267326116561889,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": -3.1199951171875
+   },
+   "infer_ms": 23.235797882080078,
    "prostate_gt_voxels": 1160,
-   "prostate_pred_voxels": 1009
+   "prostate_pred_voxels": 1009,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week5",
@@ -788,9 +1083,20 @@
     "mid": 0.9651416122004357,
     "base": 0.8943396226415095
    },
-   "infer_ms": 23.346424102783203,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.1408415764570236,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.171186447143555,
    "prostate_gt_voxels": 974,
-   "prostate_pred_voxels": 922
+   "prostate_pred_voxels": 922,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week6",
@@ -817,9 +1123,20 @@
     "mid": 0.9352051835853131,
     "base": 0.8968609865470852
    },
-   "infer_ms": 23.231983184814453,
+   "interface": {
+    "leak_bladder_ml": 0.17605197057127953,
+    "leak_bladder_pct": 0.49019607843137253,
+    "lost_bladder_ml": 0.1408415764570236,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.174047470092773,
    "prostate_gt_voxels": 1002,
-   "prostate_pred_voxels": 1020
+   "prostate_pred_voxels": 1020,
+   "prostate_components": 1
   },
   {
    "case": "V027_Week7",
@@ -846,9 +1163,20 @@
     "mid": 0.9529025191675794,
     "base": 0.897887323943662
    },
-   "infer_ms": 23.37193489074707,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.3873162294737995,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.167848587036133,
    "prostate_gt_voxels": 1002,
-   "prostate_pred_voxels": 953
+   "prostate_pred_voxels": 953,
+   "prostate_components": 1
   },
   {
    "case": "S028_Week0",
@@ -875,9 +1203,20 @@
     "mid": 0.9071207430340558,
     "base": 0.7723935389133627
    },
-   "infer_ms": 23.387908935546875,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 1.7671847343444824,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": -3.1199951171875
+   },
+   "infer_ms": 23.162841796875,
    "prostate_gt_voxels": 1271,
-   "prostate_pred_voxels": 1134
+   "prostate_pred_voxels": 1134,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week0",
@@ -904,9 +1243,20 @@
     "mid": 0.8745819397993311,
     "base": 0.7557755775577558
    },
-   "infer_ms": 23.313522338867188,
+   "interface": {
+    "leak_bladder_ml": 0.03046870231628418,
+    "leak_bladder_pct": 0.08216926869350863,
+    "lost_bladder_ml": 0.39609313011169434,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 6.239990234375,
+    "base_extent_mm": 6.239990234375
+   },
+   "infer_ms": 23.166894912719727,
    "prostate_gt_voxels": 1318,
-   "prostate_pred_voxels": 1217
+   "prostate_pred_voxels": 1217,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week1",
@@ -933,9 +1283,20 @@
     "mid": 0.8837209302325582,
     "base": 0.7644444444444445
    },
-   "infer_ms": 23.25439453125,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.39609700441360474,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.030469000339508057,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 3.120025634765625
+   },
+   "infer_ms": 23.144006729125977,
    "prostate_gt_voxels": 1407,
-   "prostate_pred_voxels": 1055
+   "prostate_pred_voxels": 1055,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week2",
@@ -962,9 +1323,20 @@
     "mid": 0.821656050955414,
     "base": 0.7524752475247525
    },
-   "infer_ms": 23.319005966186523,
+   "interface": {
+    "leak_bladder_ml": 0.070421477034688,
+    "leak_bladder_pct": 0.22002200220022003,
+    "lost_bladder_ml": 0.0,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 3.120025634765625,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.175477981567383,
    "prostate_gt_voxels": 1265,
-   "prostate_pred_voxels": 909
+   "prostate_pred_voxels": 909,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week3",
@@ -991,9 +1363,20 @@
     "mid": 0.8284424379232506,
     "base": 0.7354409317803661
    },
-   "infer_ms": 23.305177688598633,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.0704207882285118,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.167848587036133,
    "prostate_gt_voxels": 1247,
-   "prostate_pred_voxels": 851
+   "prostate_pred_voxels": 851,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week4",
@@ -1020,9 +1403,20 @@
     "mid": 0.871896722939424,
     "base": 0.7544757033248082
    },
-   "infer_ms": 23.29230308532715,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 1.1267326116561889,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 0.0,
+    "base_extent_mm": 0.0
+   },
+   "infer_ms": 23.165464401245117,
    "prostate_gt_voxels": 1264,
-   "prostate_pred_voxels": 884
+   "prostate_pred_voxels": 884,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week5",
@@ -1049,9 +1443,20 @@
     "mid": 0.864367816091954,
     "base": 0.6941431670281996
    },
-   "infer_ms": 23.249387741088867,
+   "interface": {
+    "leak_bladder_ml": 0.10563118234276771,
+    "leak_bladder_pct": 0.32786885245901637,
+    "lost_bladder_ml": 0.5985766999423503,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 3.1199951171875,
+    "base_extent_mm": -3.1199951171875
+   },
+   "infer_ms": 23.19788932800293,
    "prostate_gt_voxels": 1175,
-   "prostate_pred_voxels": 915
+   "prostate_pred_voxels": 915,
+   "prostate_components": 1
   },
   {
    "case": "K018_Week6",
@@ -1078,9 +1483,20 @@
     "mid": 0.8808864265927978,
     "base": 0.8063492063492064
    },
-   "infer_ms": 23.285627365112305,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.31689354702830314,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 77.9998779296875,
+    "base_extent_mm": 68.639892578125
+   },
+   "infer_ms": 23.197174072265625,
    "prostate_gt_voxels": 920,
-   "prostate_pred_voxels": 713
+   "prostate_pred_voxels": 713,
+   "prostate_components": 4
   },
   {
    "case": "K018_Week7",
@@ -1107,9 +1523,20 @@
     "mid": 0.8165249088699879,
     "base": 0.6666666666666666
    },
-   "infer_ms": 23.31995964050293,
+   "interface": {
+    "leak_bladder_ml": 0.0,
+    "leak_bladder_pct": 0.0,
+    "lost_bladder_ml": 0.5281559117138386,
+    "leak_rectum_ml": 0.0,
+    "leak_rectum_pct": 0.0,
+    "lost_rectum_ml": 0.0,
+    "apex_extent_mm": 6.239990234375,
+    "base_extent_mm": -3.1199951171875
+   },
+   "infer_ms": 23.19622039794922,
    "prostate_gt_voxels": 1104,
-   "prostate_pred_voxels": 737
+   "prostate_pred_voxels": 737,
+   "prostate_components": 1
   }
  ]
 }
