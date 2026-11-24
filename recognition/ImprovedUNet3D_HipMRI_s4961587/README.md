@@ -630,6 +630,11 @@ per-third Dice and timing) and `figures/overlay_<run>_<case>.png`.
 Results should match the tables in Section 6 to within about ±0.005 Dice; cuDNN
 convolutions are not fully deterministic.
 
+Run tags: `unet3d_baseline.json` is the first baseline run, kept as a record of development;
+`unet3d_baseline_v2.json` is the rerun used in all reported results (same model, rerun
+after the training script logged CE and Dice separately). Seed runs use the suffixes
+`_s1` and `_s2` (for the baseline, `unet3d_baseline_s1` and `_s2`).
+
 ### 10.4 Files
 
 ```
