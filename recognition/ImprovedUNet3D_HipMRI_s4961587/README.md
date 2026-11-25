@@ -282,7 +282,7 @@ is the only variable.
 | Optimiser | Adam, `lr = 1e-3` |
 | LR schedule | Cosine annealing from 1e-3 to ~0 over 150 epochs |
 | Batch size | 2 volumes |
-| Augmentation | None for all reported runs (`--augment` left–right flips implemented but off) |
+| Augmentation | None for all reported runs (`--augment` left–right flips implemented but off; one flipped run in Section 6.6) |
 | Precision | bf16 autocast; loss computed in fp32 |
 | Model selection | Checkpoint with the best validation prostate Dice |
 | Seeds | Training seeds 42, 1, 2 per model; patient split fixed (`split_seed = 42`) |
@@ -427,6 +427,34 @@ Improved model has the smallest spread between patients and the best per-patient
 (+0.045 over the baseline); its weakest patients are T014 (0.815) and K018 (0.818), the
 two failure modes in Section 7.
 
+### 6.6 Review experiments: augmentation and a capacity-matched 2D control
+
+*Added in response to the code review. One training seed (42) each; same split, loss,
+optimiser and schedule as the reported runs.*
+
+Table 7. Extra runs compared with the reported models (test set, 35 scans)
+
+| Model | Params | Prostate Dice | Apex / Mid / Base | HD95 (mm) | Bladder leakage (mL) |
+| --- | --- | --- | --- | --- | --- |
+| 2D U-Net (width 16, reported) | 1.9M | 0.787 | 0.766 / 0.858 / 0.775 | 6.8 ± 3.0 | 0.75 |
+| 2D U-Net, wide (width 26) | 5.1M | 0.801 | 0.791 / 0.871 / 0.773 | 6.6 ± 4.6 | 0.58 |
+| 3D U-Net (reported) | 5.6M | 0.842 | 0.805 / 0.898 / 0.813 | 5.3 ± 2.3 | 0.12 |
+| Improved 3D U-Net (reported) | 9.5M | 0.849 | 0.839 / 0.896 / 0.805 | 4.7 ± 1.3 | 0.11 |
+| Improved 3D U-Net + flips | 9.5M | 0.854 | 0.850 / 0.902 / 0.825 | 4.8 ± 1.3 | 0.16 |
+
+- **Capacity vs context.** Widening the 2D control to 5.1M parameters (first-level width
+  26, close to the 3D baseline's 5.6M) raises test Dice by 0.014 (validation 0.847, epoch
+  48), about a quarter of the 2D-to-3D gap (0.055). The wide 2D model still trails both 3D
+  models at every third and still leaks about 5× more prostate into the bladder, so most of
+  the 3D gain comes from inter-slice context rather than extra parameters.
+- **Augmentation.** Training the Improved model with random left–right flips (`--augment`)
+  gives 0.854 test Dice (validation 0.867, epoch 73), slightly above the range of the three
+  unaugmented seeds (0.839–0.850), with the largest gain at the base (0.825 vs 0.805). It
+  helps the low-contrast and small glands from Section 7: K018 0.833 vs 0.818 over its 8
+  scans (K018_Week7 0.789 vs 0.756) and T014 0.823 vs 0.815. It does not help K008_Week0
+  (0.802 vs 0.816), and rectum Dice falls (0.837 vs 0.866). With one seed this is
+  suggestive rather than conclusive, so the reported models remain unaugmented.
+
 ## 7. Failure autopsy
 
 Five test volumes were examined: the four with the lowest prostate Dice, plus the best
@@ -535,7 +563,8 @@ Table 3. Acceptance criteria from Section 2.1
 Moving from 2D to 3D is the one change that clearly pays off. It adds +0.055 prostate
 Dice on test (0.787 → 0.842) and +0.032 on validation, about 10× the seed-to-seed spread.
 It removes the 2D model's disconnected false positives (Section 7.1) and lowers HD95 from
-6.8 to 5.3 mm. The task anticipated a 5–10× cost for 3D. At this resolution the real cost
+6.8 to 5.3 mm. A 2D model widened to 5.1M parameters still reaches only 0.801 (Section
+6.6), so the gain comes mainly from 3D context rather than extra parameters. The task anticipated a 5–10× cost for 3D. At this resolution the real cost
 is about 1.4–1.7× the training time, under 2.5 GB of GPU memory, and under 30 ms per
 volume at inference. The cost concern does not hold here.
 
@@ -626,11 +655,12 @@ remain in 3D; those still need clinician review at the apex, base and bladder ne
   rate, schedule and batch size (2 volumes). This keeps the comparison fair, but none of
   the models was tuned individually. In particular, for the 2D model a batch of 2 volumes
   is 128 slices, and a different batch size or learning rate might narrow its gap.
-- **No augmentation.** None of the reported runs used data augmentation (every log in
-  `results/` records `augment: false`). Random left–right flips are implemented
-  (`--augment` in `train.py`, applied in `dataset.py`) but were not switched on.
-  Augmentation (flips, intensity changes, small rotations) might help the low-contrast and
-  unusual-size cases in Section 7.
+- **No augmentation in the reported runs.** None of them used data augmentation (every
+  log in `results/` records `augment: false`); random left–right flips are implemented
+  (`--augment`) but were off. One extra seed with flips (Section 6.6) raised test Dice
+  slightly (0.854 vs 0.849), mostly at the base and on the low-contrast K018 scans, but
+  lowered rectum Dice. More seeds, and stronger augmentation (intensity changes, small
+  rotations), would be needed to confirm a benefit.
 - **Checkpoint selection on validation prostate Dice** favours the prostate over the
   other classes. A different selection metric could change the other per-class results
   slightly.
@@ -716,6 +746,15 @@ for t in v1_s1 v1_s2; do sbatch predict.sh --model unet2d --tag $t --n_overlays 
 python review_analysis.py | tee results/review_analysis.txt
 ```
 
+The two extra runs in Section 6.6:
+
+```bash
+sbatch train.sh --model improved --augment --tag v1_aug
+sbatch train.sh --model unet2d --base 26 --tag v1_base26
+sbatch predict.sh --model improved --tag v1_aug
+sbatch predict.sh --model unet2d --base 26 --tag v1_base26
+```
+
 ### 10.4 Files
 
 ```
@@ -771,7 +810,8 @@ tutor, code reviewer and writing assistant. Specifically:
 **After the code review**
 - Claude wrote `interface_errors` (`utils.py`), the connected-component count in
   `predict.py`, `review_analysis.py` and the orientation check in `load_volume`, and
-  drafted Section 6.5 and the related edits to Sections 6.3, 8, 9 and 10. I ran everything
+  drafted Sections 6.5 and 6.6 and the related edits to Sections 5, 6.3, 8, 9 and 10, and
+  added the `--base` (model width) option. I ran everything
   on Rangpur, checked `interface_errors` on a synthetic example with known answers, and
   confirmed the original test numbers reproduced exactly.
 
